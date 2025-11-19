@@ -24,6 +24,32 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\FCMTokenController;
 use App\Models\Payment;
 
+// Agora token route for sessions
+use App\Services\AgoraService;
+
+Route::get('/agora/token', function (\Illuminate\Http\Request $request) {
+
+    $request->validate([
+        'session_id' => 'required',
+        'uid' => 'required',
+        'type' => 'required|in:host,join'
+    ]);
+
+    $sessionId = $request->session_id;
+    $uid = $request->uid;
+    $isHost = $request->type === 'host';
+
+    $agora = new AgoraService();
+    $channel = "session_" . $sessionId;
+    $token = $agora->generateToken($channel, $uid, $isHost);
+
+    return [
+        "appId" => env('AGORA_APP_ID'),
+        "token" => $token,
+        "channel" => $channel,
+        "uid" => $uid
+    ];
+});
 
 
 /*
@@ -36,6 +62,9 @@ use App\Models\Payment;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
+
+Route::post('/agora-token', [App\Http\Controllers\AgoraController::class, 'generateRtcToken']);
+
 Route::post('/save-fcm-token', function (Request $request) {
     $request->validate(['token' => 'required|string']);
 
@@ -220,7 +249,7 @@ Route::prefix('teacher')->middleware(['auth:sanctum', 'role:teacher'])->group(fu
 // routes/api.php (temporary for testing)
 Route::put('admin/payments/{payment}/complete', function(Payment $payment) {
     $payment->markAsCompleted('test_payment_' . time(), ['status' => 'success']);
-        $payment->booking->createZoomMeetingsForSessions();
+        $payment->booking->createMeetingsForSessions();
 
     return response()->json([
         'success' => true,

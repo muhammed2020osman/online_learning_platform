@@ -228,8 +228,8 @@
                         <h6>{{ $booking->course->subject->name_en ?? 'Course' }}</h6>
                         <small class="text-muted">
                             {{ $booking->teacher->first_name }} {{ $booking->teacher->last_name }}<br>
-                            {{ $booking->first_session_date->format('M d, Y') }} 
-                            {{ $booking->first_session_start_time->format('H:i') }}
+                            {{ optional($booking->first_session_date)->format('M d, Y') ?? 'N/A' }} 
+                            {{ optional($booking->first_session_start_time)->format('H:i') ?? 'N/A' }}
                         </small>
                     </div>
 
@@ -275,7 +275,7 @@
                             </p>
                             <p class="mb-0">
                                 <strong>{{ app()->getLocale() == 'ar' ? 'التاريخ:' : 'Date:' }}</strong><br>
-                                {{ $booking->first_session_date->format('M d, Y') }}
+                                {{ optional($booking->first_session_date)->format('M d, Y') }}
                             </p>
                         </small>
                     </div>

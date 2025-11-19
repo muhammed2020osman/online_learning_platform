@@ -417,7 +417,7 @@ class TeacherCourseController extends Controller
         try {
             // Create Zoom meeting if not exists
             if (!$session->meeting_id) {
-                $session->createZoomMeeting();
+                $session->createMeeting();
             }
 
             $session->start();

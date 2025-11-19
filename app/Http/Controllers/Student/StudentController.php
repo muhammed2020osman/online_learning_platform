@@ -56,6 +56,10 @@ class StudentController extends Controller
      */
     public function teachers(Request $request)
     {
+        $private_lessons_service = Services::where('key_name', 'private_lessons')
+            ->orWhere('name_en', 'LIKE', '%private lessons%')
+            ->pluck('id');
+        
         $query = User::where('role_id', 3)
             ->with([
                 'profile.profilePhoto',
@@ -66,6 +70,9 @@ class StudentController extends Controller
                 'availableSlots',
                 'reviews',
             ])
+            ->whereHas('teacherServices', function ($q) use ($private_lessons_service) {
+                $q->whereIn('service_id', $private_lessons_service);
+            })
             ->withCount('reviews');
 
         // Filter by service

@@ -97,7 +97,13 @@
                 </ul>
             </li>
             @endif
-
+            <!-- Availability -->
+            <li class="nav-item {{ request()->is('teacher/availability*') ? 'active' : '' }}">
+                <a href="{{ route('teacher.availability.index') }}" class="nav-link">
+                    <i class="feather icon-clock"></i>
+                    <span>{{ app()->getLocale() == 'ar' ? 'اوقاتي' : 'My Availability' }}</span>
+                </a>
+            </li>
             <!-- Bookings -->
             <li class="nav-item {{ request()->is('teacher/bookings*') ? 'active' : '' }}">
                 <a href="{{ route('teacher.bookings.index') }}" class="nav-link">

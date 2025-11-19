@@ -45,6 +45,10 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\FCMTokenController;
 use Illuminate\Support\Facades\Artisan;
 
+// Agora Meeting
+Route::get('/meet', function () {
+    return view('meet');
+});
 
 Route::get('/test-firebase-path', function () {
     // Clear config cache first

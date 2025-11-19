@@ -190,23 +190,27 @@ class UserController extends Controller
                 'data' => $this->getFullTeacherData($user)
             ]);
         } else {
-            // Student: return basic profile data
-            $profile->load('profilePhoto');
+            // Student: return basic profile data with profile photo from attachments
+            $profilePhoto = $user->attachments()
+                ->where('attached_to_type', 'profile_picture')
+                ->latest()
+                ->value('file_path');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Profile created successfully',
                 'data' => [
                     'id' => $profile->id,
+                    'user_id' => $user->id,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'email' => $user->email,
+                    'phone_number' => $user->phone_number,
                     'bio' => $profile->bio,
                     'language_pref' => $profile->language_pref,
                     'terms_accepted' => $profile->terms_accepted,
                     'verified' => $profile->verified,
-                    'user' => [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'phone_number' => $user->phone_number,
-                    ]
+                    'profile_photo' => $profilePhoto,
                 ]
             ]);
         }
@@ -263,7 +267,7 @@ class UserController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
-        
+
         if ($user->role && $user->role->name_key === 'teacher') {
             try {
                 if ($request->hasFile('certificate')) {
@@ -281,6 +285,7 @@ class UserController extends Controller
             }
         }
 
+        $user->refresh();
         $profile->load('profilePhoto');
 
         if ($user->role_id == 3) {
@@ -299,23 +304,27 @@ class UserController extends Controller
                 'data' => $this->getFullTeacherData($user)
             ]);
         } else {
-            // Student: return basic profile data
+            // Student: return basic profile data with profile photo from attachments
+            $profilePhoto = $user->attachments()
+                ->where('attached_to_type', 'profile_picture')
+                ->latest()
+                ->value('file_path');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
                 'data' => [
+                    'role_id' => $user->role_id,
                     'id' => $profile->id,
-                    'bio' => $profile->bio,
-                    'description' => $profile->description,
-                    'profile_photo' => $profile->profilePhoto,
+                    'user_id' => $user->id,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'email' => $user->email,
+                    'phone_number' => $user->phone_number,
                     'terms_accepted' => $profile->terms_accepted,
                     'verified' => $profile->verified,
                     'language_pref' => $profile->language_pref,
-                    'user' => [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                    ]
+                    'profile_photo' => $profilePhoto,
                 ]
             ]);
         }
@@ -592,32 +601,32 @@ class UserController extends Controller
 
     // Update or create teacher services only
     public function updateTeacherServices(Request $request)
-{
-    $request->validate([
-        'services_id' => 'required|array',
-        'services_id.*' => 'exists:services,id',
-    ]);
+    {
+        $request->validate([
+            'services_id' => 'required|array',
+            'services_id.*' => 'exists:services,id',
+        ]);
 
-    $teacher = $request->user();
-    TeacherServices::where('teacher_id', $teacher->id)->delete();
+        $teacher = $request->user();
+        TeacherServices::where('teacher_id', $teacher->id)->delete();
 
-    try {
-        foreach ($request->services_id as $service_id) {
-            TeacherServices::create([
-                'teacher_id' => $teacher->id,
-                'service_id' => $service_id,
-            ]);
+        try {
+            foreach ($request->services_id as $service_id) {
+                TeacherServices::create([
+                    'teacher_id' => $teacher->id,
+                    'service_id' => $service_id,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('TeacherServices save error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
-    } catch (\Exception $e) {
-        Log::error('TeacherServices save error: ' . $e->getMessage());
-        return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
-    }
 
-    return response()->json([
-        'success' => true,
-        'data' => $request->services_id
-    ]);
-}  
+        return response()->json([
+            'success' => true,
+            'data' => $request->services_id
+        ]);
+    }
 
     // Update or create teacher subjects only
     public function updateTeacherSubjects(Request $request)
@@ -649,12 +658,12 @@ class UserController extends Controller
             ->where('attached_to_type', 'profile_picture')
             ->latest()
             ->value('file_path');
-            
+
         $resume = $teacher->attachments()
             ->where('attached_to_type', 'resume')
             ->latest()
             ->value('file_path');
-            
+
         $certificate = $teacher->attachments()
             ->where('attached_to_type', 'certificate')
             ->latest()
@@ -698,7 +707,7 @@ class UserController extends Controller
             'group_hour_price' => (float) optional($teacher->teacherInfo)->group_hour_price ?? 0,
             'max_group_size' => (int) optional($teacher->teacherInfo)->max_group_size ?? 0,
             'min_group_size' => (int) optional($teacher->teacherInfo)->min_group_size ?? 0,
-            
+
             // Add earnings data
             'total_lessons' => (int) ($earnings->total_lessons ?? 0),
             'current_lessons' => (int) $currentLessons,
@@ -706,7 +715,7 @@ class UserController extends Controller
             'todayEarnings' => (float) ($earnings->today_earnings ?? 0),
             'monthEarnings' => (float) ($earnings->month_earnings ?? 0),
             'totalEarnings' => (float) ($earnings->total_earnings ?? 0),
-            
+
             // Add teacher services (array of service IDs)
             'teacher_services' => optional($teacher->teacherServices)->pluck('service_id')->toArray() ?? [],
         ];
@@ -749,7 +758,7 @@ class UserController extends Controller
         return $attachment->file_path;
     }
 
-   
+
     private function saveAttachmentFile(Request $request, string $key, string $folder, User $user, string $attachedToType): ?string
     {
         if (!$request->hasFile($key)) {

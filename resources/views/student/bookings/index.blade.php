@@ -113,10 +113,10 @@
                             <div class="mb-2">
                                 <small class="text-muted">
                                     <i class="fas fa-calendar"></i>
-                                    {{ $booking->first_session_date->format('M d, Y') }}
+                                    {{ optional($booking->first_session_date)->format('M d, Y') ?? 'N/A' }}
                                     <br>
                                     <i class="fas fa-clock"></i>
-                                    {{ $booking->first_session_start_time->format('H:i') }} - {{ $booking->first_session_end_time->format('H:i') }}
+                                    {{ optional($booking->first_session_start_time)->format('H:i') ?? 'N/A' }} - {{ optional($booking->first_session_end_time)->format('H:i') ?? 'N/A' }}
                                 </small>
                             </div>
 

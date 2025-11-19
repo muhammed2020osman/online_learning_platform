@@ -271,13 +271,13 @@ class Booking extends Model
     }
 
 
-public function createZoomMeetingsForSessions(): void
+public function createMeetingsForSessions(): void
 {
     // Get all sessions for this booking
     $sessions = $this->sessions;
     
     foreach ($sessions as $session) {
-        $session->createZoomMeeting();
+        $session->createMeeting();
     }
 }
 }

@@ -50,7 +50,7 @@
 
                                     <div class="mb-0">
                                         <small class="text-muted d-block mb-1">{{ app()->getLocale() == 'ar' ? 'تاريخ الحجز' : 'Booking Date' }}</small>
-                                        <small>{{ $booking->booking_date->format('M d, Y H:i') }}</small>
+                                        <small>{{ optional($booking->booking_date)->format('M d, Y H:i') ?? 'N/A' }}</small>
                                     </div>
                                 </div>
                             </div>
@@ -90,12 +90,12 @@
                                     
                                     <div class="mb-3 pb-3 border-bottom">
                                         <small class="text-muted d-block mb-1">{{ app()->getLocale() == 'ar' ? 'تاريخ الجلسة الأولى' : 'First Session Date' }}</small>
-                                        <h6 class="mb-0">{{ $booking->first_session_date->format('M d, Y') }}</h6>
+                                        <h6 class="mb-0">{{ optional($booking->first_session_date)->format('M d, Y') ?? 'N/A' }}</h6>
                                     </div>
 
                                     <div class="mb-3 pb-3 border-bottom">
                                         <small class="text-muted d-block mb-1">{{ app()->getLocale() == 'ar' ? 'الوقت' : 'Time' }}</small>
-                                        <small>{{ $booking->first_session_start_time->format('H:i') }} - {{ $booking->first_session_end_time->format('H:i') }}</small>
+                                        <small>{{ optional($booking->first_session_start_time)->format('H:i') ?? 'N/A' }} - {{ optional($booking->first_session_end_time)->format('H:i') ?? 'N/A' }}</small>
                                     </div>
 
                                     <div class="mb-0">

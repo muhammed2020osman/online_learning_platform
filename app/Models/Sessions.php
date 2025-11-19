@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
 use MacsiDigital\Zoom\Facades\Zoom;
 use Illuminate\Support\Facades\Log;
+use App\Services\AgoraService;
 
 class Sessions extends Model
 {
@@ -337,79 +338,38 @@ class Sessions extends Model
         return $this->update(['teacher_rating' => $rating]);
     }
 
-    public function createZoomMeeting(): bool
+    public function createMeeting(): bool
     {
+        // Replace Zoom meeting creation with Agora meeting creation via AgoraService
         try {
-            // Default values
-            $topic = "Session #{$this->session_number}";
-            $subjectName = null;
-            $teacherName = $this->teacher ? $this->teacher->first_name : '';
+            $agoraService = new AgoraService();
 
-            if ($this->booking && $this->booking->course) {
-                $subjectName = $this->booking->course->category->name ?? null;
-                $courseName = $this->booking->course->name ?? '';
-                $topic = "Course: {$courseName}" . ($subjectName ? " - Subject: {$subjectName}" : "") . " - Teacher: {$teacherName}";
-            } elseif ($this->booking && $this->booking->order) {
-                $subjectName = $this->booking->order->subject->name ?? '';
-                $topic = "Subject: {$subjectName} - Teacher: {$teacherName}";
-            } else {
-                $topic = "Session #{$this->session_number}" . ($teacherName ? " - Teacher: {$teacherName}" : "");
-            }
+            // Pass session id and participants; AgoraService expected to return meeting info array/object
+            $meeting = $agoraService->createMeeting($this->id, $this->teacher_id, $this->student_id);
 
-            // Robust extraction: pick the first YYYY-MM-DD from session_date and first HH:MM(:SS) from start_time.
-            $rawDate = (string) $this->session_date;
-            $rawTime = (string) $this->start_time;
-
-            preg_match('/\d{4}-\d{2}-\d{2}/', $rawDate, $md);
-            preg_match('/\d{2}:\d{2}(:\d{2})?/', $rawTime, $mt);
-
-            if (empty($md) || empty($mt)) {
-                Log::error('Invalid session_date or start_time for Zoom meeting', [
-                    'session_id' => $this->id,
-                    'session_date' => $rawDate,
-                    'start_time' => $rawTime,
-                ]);
+            if (!$meeting) {
+                Log::error('AgoraService returned empty meeting for session ' . $this->id);
                 return false;
             }
 
-            $date = $md[0];
-            // Normalize time to HH:MM:SS
-            $time = strlen($mt[0]) === 5 ? $mt[0] . ':00' : $mt[0];
-            $startDateTime = $date . 'T' . $time; // ISO 8601 without timezone (Zoom accepts this)
- 
-            $user = \MacsiDigital\Zoom\Facades\Zoom::user()->first();
- 
-            $meeting = $user->meetings()->create([
-                'topic' => $topic,
-                'type' => 2,
-                'start_time' => $startDateTime,
-                'duration' => $this->duration,
-                'timezone' => 'Asia/Riyadh',
-                'password' => $this->generateMeetingPassword(),
-                'host_video' => true,
-                'participant_video' => true,
-                'join_before_host' => true,
-                'mute_upon_entry' => true,
-                'waiting_room' => false,
-                'approval_type' => 0,
-                'audio' => 'both',
-                'auto_recording' => 'none'
-            ]);
- 
+            // Accept both array and object responses
+            $meetingId = is_array($meeting) ? ($meeting['id'] ?? null) : ($meeting->id ?? null);
+            $joinUrl = is_array($meeting) ? ($meeting['join_url'] ?? null) : ($meeting->join_url ?? null);
+            $hostUrl = is_array($meeting) ? ($meeting['host_url'] ?? null) : ($meeting->host_url ?? null);
+
             $this->update([
-                'meeting_id' => $meeting->id,
-                'join_url' => $meeting->join_url,
-                'host_url' => $meeting->start_url,
-                'teacher_notes' => $this->teacher_notes ? $this->teacher_notes . "\nHost URL: " . $meeting->start_url : "Host URL: " . $meeting->start_url
+                'meeting_id' => $meetingId,
+                'join_url' => $joinUrl,
+                'host_url' => $hostUrl,
             ]);
- 
-            Log::info("Zoom meeting created", ['session_id' => $this->id, 'meeting_id' => $meeting->id]);
+
+            Log::info('Agora meeting created for session', ['session_id' => $this->id, 'meeting' => $meeting]);
             return true;
- 
         } catch (\Exception $e) {
-            Log::error('Failed to create Zoom meeting for session ' . $this->id . ': ' . $e->getMessage(), [
+            Log::error('Failed to create Agora meeting for session ' . $this->id . ': ' . $e->getMessage(), [
                 'session_date' => (string)$this->session_date,
-                'start_time' => (string)$this->start_time
+                'start_time' => (string)$this->start_time,
+                'trace' => $e->getTraceAsString()
             ]);
             return false;
         }

@@ -9,7 +9,7 @@ use App\Models\Sessions;
 
 trait ZoomMeetingTrait
 {
-    public function createZoomMeeting(array $data)
+    public function createMeeting(array $data)
     {
         // Replace with your Zoom API Key & Secret or Bearer Token
         $zoomToken = config('services.zoom.token'); // Store token in config/services.php

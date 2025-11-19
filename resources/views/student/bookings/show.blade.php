@@ -12,7 +12,6 @@
             <h2>{{ app()->getLocale() == 'ar' ? 'تفاصيل الحجز' : 'Booking Details' }}</h2>
         </div>
     </div>
-
     <!-- Alerts -->
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -53,7 +52,7 @@
                     <div class="row">
                         <div class="col-md-6">
                             <p><strong>{{ app()->getLocale() == 'ar' ? 'تاريخ الحجز:' : 'Booking Date:' }}</strong><br>
-                                {{ $booking->booking_date->format('M d, Y H:i') }}</p>
+                                {{ optional($booking->booking_date)->format('M d, Y H:i') ?? 'N/A' }}</p>
                         </div>
                         <div class="col-md-6">
                             <p><strong>{{ app()->getLocale() == 'ar' ? 'نوع الجلسة:' : 'Session Type:' }}</strong><br>
@@ -102,11 +101,11 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <p><strong>{{ app()->getLocale() == 'ar' ? 'تاريخ الجلسة الأولى:' : 'First Session Date:' }}</strong><br>
-                                {{ $booking->first_session_date->format('M d, Y') }}</p>
+                                {{ optional($booking->first_session_date)->format('M d, Y') ?? 'N/A' }}</p>
                         </div>
                         <div class="col-md-6">
                             <p><strong>{{ app()->getLocale() == 'ar' ? 'الوقت:' : 'Time:' }}</strong><br>
-                                {{ $booking->first_session_start_time->format('H:i') }} - {{ $booking->first_session_end_time->format('H:i') }}</p>
+                                {{ optional($booking->first_session_start_time)->format('H:i') ?? 'N/A' }} - {{ optional($booking->first_session_end_time)->format('H:i') ?? 'N/A' }}</p>
                         </div>
                     </div>
                     <div class="row mb-3">
@@ -144,8 +143,8 @@
                                                     {{ app()->getLocale() == 'ar' ? 'الجلسة' : 'Session' }} #{{ $session->session_number }}
                                                 </h6>
                                                 <small class="text-muted">
-                                                    {{ $session->session_date->format('M d, Y') }} - 
-                                                    {{ $session->start_time->format('H:i') }}
+                                                    {{ optional($session->session_date)->format('M d, Y') ?? 'N/A' }} - 
+                                                    {{ optional($session->start_time)->format('H:i') ?? 'N/A' }}
                                                 </small>
                                             </div>
                                             <span class="badge 

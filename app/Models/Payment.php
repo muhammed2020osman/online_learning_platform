@@ -286,7 +286,7 @@ protected static function boot()
             $payment->booking->update(['status' => Booking::STATUS_CONFIRMED]);
             
             // Create Zoom meetings for all sessions
-            $payment->booking->createZoomMeetingsForSessions();
+            $payment->booking->createMeetingsForSessions();
         }
     });
 }

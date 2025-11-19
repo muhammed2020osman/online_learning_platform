@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Sessions;
 use App\Models\Booking;
-use App\Jobs\GenerateZoomMeetingJob;
 use App\Jobs\SendSessionReminderJob;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -268,7 +267,7 @@ class SessionNotificationService
         $session->update(['zoom_creation_attempted_at' => now()]);
 
         // Dispatch job to create Zoom meeting
-        $success = $session->createZoomMeeting();
+        $success = $session->createMeeting();
 
         Log::info('Zoom meeting creation job dispatched', [
             'session_id' => $session->id,
