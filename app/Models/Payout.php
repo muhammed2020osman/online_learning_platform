@@ -28,6 +28,12 @@ class Payout extends Model
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
+    const STATUS_PENDING = 'pending';
+    const STATUS_COMPLETED = 'completed';
+    const STATUS_FAILED = 'failed';
+    const STATUS_CANCELLED = 'cancelled';
+    const STATUS_REJECTED = 'rejected';
+
     public function paymentMethod()
     {
         return $this->belongsTo(UserPaymentMethod::class, 'payment_method_id');

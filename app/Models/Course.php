@@ -61,11 +61,6 @@ class Course extends Model
         return $this->attributes['teacher_basic'] ?? null;
     }
 
-    public function subject()
-    {
-        return $this->belongsTo(Subject::class, 'subject_id');
-    }
-
     public function educationLevel()
     {
         return $this->belongsTo(EducationLevel::class, 'education_level_id');

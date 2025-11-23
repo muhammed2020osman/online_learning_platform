@@ -23,6 +23,8 @@ class Booking extends Model
         'student_id',
         'teacher_id',
         'course_id',
+        'subject_id',
+        'language_id',
         'order_id',
         'session_type',
         'sessions_count',
@@ -74,6 +76,7 @@ class Booking extends Model
     // Session type constants
     const TYPE_SINGLE = 'single';
     const TYPE_PACKAGE = 'package';
+    // Relationships
 
     public function student(): BelongsTo
     {
@@ -90,6 +93,10 @@ class Booking extends Model
     return $this->belongsTo(\App\Models\Orders::class, 'order_id');
 }
 
+    public function subject(): BelongsTo
+    {
+        return $this->belongsTo(Subject::class);
+    }
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);

@@ -21,35 +21,36 @@ use App\Http\Controllers\API\TeacherController;
 use App\Http\Controllers\API\PaymentMethodController;
 use App\Http\Controllers\API\UserPaymentMethodController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\API\SessionsController;
 use App\Http\Controllers\FCMTokenController;
 use App\Models\Payment;
 
 // Agora token route for sessions
 use App\Services\AgoraService;
 
-Route::get('/agora/token', function (\Illuminate\Http\Request $request) {
+// Route::get('/agora/token', function (\Illuminate\Http\Request $request) {
 
-    $request->validate([
-        'session_id' => 'required',
-        'uid' => 'required',
-        'type' => 'required|in:host,join'
-    ]);
+//     $request->validate([
+//         'session_id' => 'required',
+//         'uid' => 'required',
+//         'type' => 'required|in:host,join'
+//     ]);
 
-    $sessionId = $request->session_id;
-    $uid = $request->uid;
-    $isHost = $request->type === 'host';
+//     $sessionId = $request->session_id;
+//     $uid = $request->uid;
+//     $isHost = $request->type === 'host';
 
-    $agora = new AgoraService();
-    $channel = "session_" . $sessionId;
-    $token = $agora->generateToken($channel, $uid, $isHost);
+//     $agora = new AgoraService();
+//     $channel = "session_" . $sessionId;
+//     $token = $agora->generateToken($channel, $uid, $isHost);
 
-    return [
-        "appId" => env('AGORA_APP_ID'),
-        "token" => $token,
-        "channel" => $channel,
-        "uid" => $uid
-    ];
-});
+//     return [
+//         "appId" => env('AGORA_APP_ID'),
+//         "token" => $token,
+//         "channel" => $channel,
+//         "uid" => $uid
+//     ];
+// });
 
 
 /*
@@ -90,7 +91,7 @@ Route::get('/education-levels', [EducationLevelController::class, 'levelsWithCla
 Route::get('/classes/{education_level_id}', [EducationLevelController::class, 'classes']);
 Route::get('subjectsClasses/{class_id}', [EducationLevelController::class, 'getSubjectsByClass']);
 Route::post('payments/direct', [PaymentController::class, 'directPayment']);
-Route::get('payments/result', [PaymentController::class, 'paymentResult']);
+Route::get('payments/result', [PaymentController::class, 'paymentResult'])->name('api.payment.result');
 Route::get('payment-methods', [PaymentMethodController::class, 'index']);
 Route::get('banks', [PaymentMethodController::class, 'banks']);
 // ======================
@@ -158,13 +159,19 @@ Route::prefix('student')->middleware(['auth:sanctum', 'role:student'])->group(fu
     Route::post('/orders/{order_id}/applications/{application_id}/accept', [OrdersController::class, 'acceptApplication']);
     // bookings
     // Booking endpoints
-    Route::post('/bookings', [BookingController::class, 'createBooking']); // create booking
-    Route::get('/bookings', [BookingController::class, 'getStudentBookings']);   // list my bookings
-    Route::get('/bookings/{bookingId}', [BookingController::class, 'getBookingDetails']); // view specific booking
-    Route::put('/bookings/{bookingId}/cancel', [BookingController::class, 'cancelBooking']); // cancel booking
+    Route::post('/booking', [BookingController::class, 'createBooking']); // create booking
+    Route::get('/booking', [BookingController::class, 'getStudentBookings']);   // list my bookings
+    Route::get('/booking/{bookingId}', [BookingController::class, 'getBookingDetails']); // view specific booking
+    Route::put('/booking/{bookingId}/cancel', [BookingController::class, 'cancelBooking']); // cancel booking
+    Route::post('/booking/pay', [BookingController::class, 'payBooking']); // pay for booking (card payment)
     // payments history
     Route::post('/payments', [PaymentController::class, 'store']); // pay for booking/course
     Route::get('/payments/history', [PaymentController::class, 'history']); // payment history
+    // sessions
+    Route::get('/sessions', [SessionsController::class, 'index']); // list my sessions
+    Route::get('/sessions/grouped', [SessionsController::class, 'groupedSessions']); // teacher: grouped sessions by time
+    Route::get('/sessions/{sessionId}', [SessionsController::class, 'show']); // session details
+    Route::post('/sessions/{sessionId}/join', [SessionsController::class, 'join']); // join session
     // add payment method
     Route::get('payment-methods', [UserPaymentMethodController::class, 'index']);
     Route::post('payment-methods', [UserPaymentMethodController::class, 'store']);
@@ -223,12 +230,20 @@ Route::prefix('teacher')->middleware(['auth:sanctum', 'role:teacher'])->group(fu
     Route::delete('/applications/{application_id}', [TeacherApplicationController::class, 'cancelApplication']);
     // bookings
     Route::post('booking', [BookingController::class , 'index']);
+    //sessions
+    Route::get('/sessions', [SessionsController::class, 'index']);
+    Route::get('/sessions/{id}', [SessionsController::class, 'show']);
+    Route::post('/sessions/{id}/start', [SessionsController::class, 'start']);
+    Route::post('/sessions/{id}/end', [SessionsController::class, 'end']);
 
     Route::get('/teachers', [UserController::class, 'listTeachers']);
     Route::get('/teachers/{id}', [UserController::class, 'teacherDetails']);
     //wallet
     Route::get('/wallet', [WalletController::class, 'show']);
     Route::post('/wallet/withdraw', [WalletController::class, 'withdraw']);
+    Route::get('/wallet/withdrawals', [WalletController::class, 'listWithdrawals']);
+    Route::get('/wallet/withdrawals/{id}', [WalletController::class, 'getWithdrawal']);
+    Route::delete('/wallet/withdrawals/{id}', [WalletController::class, 'cancelWithdrawal']);
     // payments methods
     Route::get('payment-methods', [UserPaymentMethodController::class, 'index']);
     Route::post('payment-methods', [UserPaymentMethodController::class, 'store']);

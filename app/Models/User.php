@@ -134,4 +134,16 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasOne(UserPaymentMethod::class, 'user_id')->where('is_default', true);
     }
+
+    // function that return only the path of profile photo
+    public function getProfilePhotoPathAttribute()
+    {
+        $attachment = $this->attachments()
+            ->where('attached_to_type', 1)
+            ->where('user_id', $this->id)
+            ->latest()
+            ->first();
+
+        return $attachment ? $attachment->file_path : null;
+    }
 }

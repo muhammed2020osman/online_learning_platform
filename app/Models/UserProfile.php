@@ -29,6 +29,7 @@ class UserProfile extends Model
 
     public function profilePhoto(): BelongsTo
     {
-        return $this->belongsTo(Attachment::class, 'profile_photo_id');
+        $profilePhotoPath = Attachment::find($this->user_id)->file_path ?? null;
+        return $profilePhotoPath;
     }
 }

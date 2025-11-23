@@ -475,8 +475,16 @@ class AvailabilitySlot extends Model
 
         static::updating(function ($slot) {
             // Prevent booking if slot is not available
-            if ($slot->isDirty('is_booked') && $slot->is_booked && !$slot->is_available) {
-                throw new \InvalidArgumentException('Cannot book unavailable slot');
+            // Note: When booking a slot, we set both is_booked=true and is_available=false.
+            // Check: is_available should be true BEFORE we're trying to set is_booked to true.
+            // If it's already false (from a previous partial update), allow the booking flow.
+            if ($slot->isDirty('is_booked') && $slot->is_booked) {
+                // Get the value BEFORE this update (the original value)
+                $wasAvailable = $slot->getOriginal('is_available');
+                // Only reject if it WAS unavailable before this update
+                if ($wasAvailable === 0 || $wasAvailable === false) {
+                    throw new \InvalidArgumentException('Cannot book unavailable slot');
+                }
             }
         });
 

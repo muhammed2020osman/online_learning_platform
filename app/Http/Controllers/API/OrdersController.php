@@ -12,6 +12,7 @@ use App\Models\Payment;
 use App\Models\TeachersApplications;
 use App\Models\User;
 use App\Helpers\NotificationHelper;
+use App\Services\FirebaseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -63,27 +64,99 @@ class OrdersController extends Controller
             }
 
             DB::commit();
-            $teachers = User::where('role_id', 3)
+            // Find candidate teachers by subject (and class if provided)
+            $candidateTeachersQuery = User::where('role_id', 3)
                 ->whereIn('id', function ($query) use ($order) {
                     $query->select('teacher_id')
                         ->from('teacher_subjects')
                         ->where('subject_id', $order->subject_id);
-                })
-                ->whereIn('id', function ($query) use ($order) {
+                });
+
+            if (!empty($order->class_id)) {
+                $candidateTeachersQuery->whereIn('id', function ($query) use ($order) {
                     $query->select('teacher_id')
                         ->from('teacher_teach_classes')
                         ->where('class_id', $order->class_id);
-                })
-                ->get();
-            try {
-                NotificationHelper::orderCreated($teachers, $order);
-            } catch (\Throwable $e) {
-                // Log the error or include it in the response for debugging
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Order created, but notification failed: ' . $e->getMessage(),
-                    'data' => $order
-                ], 500);
+                });
+            }
+
+            $candidateTeachers = $candidateTeachersQuery->get();
+
+            $firebase = new FirebaseService();
+            $teachersNotified = [];
+
+            // For each candidate teacher, evaluate price and availability
+            foreach ($candidateTeachers as $teacher) {
+                // Determine teacher hourly price from common fields if available
+                $teacherPrice = $teacher->hourly_price ?? $teacher->price_per_hour ?? $teacher->hourly_rate ?? null;
+
+                if ($order->max_price && $teacherPrice !== null && $teacherPrice > $order->max_price) {
+                    continue; // teacher too expensive
+                }
+
+                // Find at least one matching available slot for this teacher
+                $matchedSlot = null;
+                foreach ($order->availableSlots as $ordSlot) {
+                    // Check teacher's schedule conflicts (existing sessions)
+                    $conflict = Sessions::where('teacher_id', $teacher->id)
+                        ->where('session_date', $ordSlot->date)
+                        ->where('start_time', $ordSlot->start_time)
+                        ->whereIn('status', [Sessions::STATUS_SCHEDULED, Sessions::STATUS_IN_PROGRESS])
+                        ->exists();
+
+                    if ($conflict) {
+                        continue;
+                    }
+
+                    // Also allow teachers who have an availability slot matching this time and not booked
+                    $hasAvail = AvailabilitySlot::where('teacher_id', $teacher->id)
+                        ->where('date', $ordSlot->date)
+                        ->where('start_time', $ordSlot->start_time)
+                        ->where('is_available', 1)
+                        ->where('is_booked', 0)
+                        ->exists();
+
+                    if ($hasAvail) {
+                        $matchedSlot = $ordSlot;
+                        break;
+                    }
+                }
+
+                if (!$matchedSlot) {
+                    // teacher doesn't have any matching free slot
+                    continue;
+                }
+
+                // Get a possible device token field
+                $token = $teacher->fcm_token ?? $teacher->firebase_token ?? $teacher->device_token ?? null;
+                if (empty($token)) {
+                    $teachersNotified[] = ['teacher_id' => $teacher->id, 'notified' => false, 'reason' => 'no_token'];
+                    continue;
+                }
+
+                // Compose message
+                $title = 'New order request';
+                $body = sprintf('A student requested %s on %s at %s',
+                    ($order->subject->name ?? 'subject'),
+                    $matchedSlot->date,
+                    $matchedSlot->start_time
+                );
+
+                $data = [
+                    'order_id' => $order->id,
+                    'subject_id' => $order->subject_id,
+                    'type' => $order->type,
+                    'slot_date' => $matchedSlot->date,
+                    'slot_start_time' => $matchedSlot->start_time,
+                ];
+
+                try {
+                    $sent = $firebase->sendToToken($token, $title, $body, $data);
+                    $teachersNotified[] = ['teacher_id' => $teacher->id, 'notified' => $sent];
+                } catch (\Throwable $e) {
+                    Log::error('Failed to notify teacher', ['teacher_id' => $teacher->id, 'error' => $e->getMessage()]);
+                    $teachersNotified[] = ['teacher_id' => $teacher->id, 'notified' => false, 'reason' => $e->getMessage()];
+                }
             }
 
             $order->load(['subject', 'availableSlots']);
@@ -92,7 +165,7 @@ class OrdersController extends Controller
                 'success' => true,
                 'message' => 'Order created successfully',
                 'data' => $order,
-                'teachers_notified' => $teachers
+                'teachers_notified' => $teachersNotified
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();

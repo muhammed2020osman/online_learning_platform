@@ -20,7 +20,7 @@ class TeacherController extends Controller
     {
         $teacherId = $request->user()->id;
         $subjects = TeacherSubject::where('teacher_id', $teacherId)
-            ->with('subject') // You can define a relation in TeacherSubject for subject if needed
+            ->with('subject','class') // You can define a relation in TeacherSubject for subject if needed
             ->get();
         $subjectsData = $subjects->map(function ($item) {
             return [

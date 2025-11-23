@@ -39,7 +39,7 @@ class UserPaymentMethodController extends Controller
         } elseif ($user->role->name_key === 'student') {
             $request->validate([
                 'payment_method_id' => 'required|exists:payment_methods,id',
-                'card_brand' => 'required|string',
+                'card_brand' => 'nullable|string',
                 'card_number' => 'required|string',
                 'card_holder_name' => 'required|string',
                 'card_cvc' => 'required|string',

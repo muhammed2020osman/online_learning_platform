@@ -304,7 +304,10 @@ class AuthController extends Controller
             $userController = new UserController();
             $user = $userController->getFullTeacherData($user);
         } else {
-            $userProfile = $user->profile;
+            $profilePhoto = $user->attachments()
+                ->where('attached_to_type', 'profile_picture')
+                ->latest()
+                ->value('file_path');
             // For other roles, you can customize the data as needed
             $user = [
                 'id' => $user->id,
@@ -314,7 +317,8 @@ class AuthController extends Controller
                 'nationality' => $user->nationality,
                 'phone_number' => $user->phone_number,
                 'role_id' => $user->role_id,
-                'profile' => $userProfile
+                'profile' => 
+                    ['profile_photo' => $profilePhoto]
             ];
         }
         return response()->json([
