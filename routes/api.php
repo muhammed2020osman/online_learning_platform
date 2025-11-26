@@ -22,11 +22,14 @@ use App\Http\Controllers\API\PaymentMethodController;
 use App\Http\Controllers\API\UserPaymentMethodController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\API\SessionsController;
+use App\Http\Controllers\API\LanguageStudyController;
+use App\Http\Controllers\API\LanguageController;
 use App\Http\Controllers\FCMTokenController;
 use App\Models\Payment;
 
 // Agora token route for sessions
 use App\Services\AgoraService;
+use Illuminate\Support\Facades\Lang;
 
 // Route::get('/agora/token', function (\Illuminate\Http\Request $request) {
 
@@ -85,6 +88,10 @@ Route::get('/subjects/{id}', [ServicesController::class, 'listSubjects']);
 Route::get('/subjects/{id}', [ServicesController::class, 'subjectDetails']);
 Route::get('courses', [CourseController::class, 'index']); // browse/search
 Route::get('courses/{id}', [CourseController::class, 'show']); // course details
+Route::get('language-study',[LanguageStudyController::class,'index']);
+Route::get('language-study/teachers', [LanguageStudyController::class, 'getAllTeachersWithLanguages']); // Get all teachers with languages
+Route::get('language-study/teacher/{teacherId}', [LanguageStudyController::class, 'getTeacherLanguages']); // Get specific teacher languages
+Route::get('language-study/teachers/filter', [LanguageStudyController::class, 'filterTeachersByLanguage']); // Filter teachers by language
 Route::get('/teachers', [UserController::class, 'listTeachers']);
 Route::get('/teachers/{id}', [UserController::class, 'teacherDetails']);
 Route::get('/education-levels', [EducationLevelController::class, 'levelsWithClassesAndSubjects']);
@@ -191,7 +198,8 @@ Route::prefix('student')->middleware(['auth:sanctum', 'role:student'])->group(fu
     Route::get('/disputes/{id}', [DisputeController::class, 'show']); // View specific dispute
     Route::delete('/disputes/{id}', [DisputeController::class, 'destroy']); // Delete specific dispute
 
-
+    // certificates
+    Route::get('/certificates', [UserController::class, 'listCertificates']);
 });
 
 Route::prefix('teacher')->middleware(['auth:sanctum', 'role:teacher'])->group(function () {
@@ -258,7 +266,23 @@ Route::prefix('teacher')->middleware(['auth:sanctum', 'role:teacher'])->group(fu
     Route::get('/disputes/my', [DisputeController::class, 'index']); // List my disputes
     Route::get('/disputes/{id}', [DisputeController::class, 'show']); // View specific dispute
     Route::delete('/disputes/{id}', [DisputeController::class, 'destroy']); // Delete specific dispute
+    
+    // Language study routes for teachers
+    Route::post('/language-study/teacher/languages', [LanguageStudyController::class, 'addTeacherLanguages']);
+    Route::put('/language-study/teacher/languages', [LanguageStudyController::class, 'updateTeacherLanguages']);
+    Route::delete('/language-study/teacher/languages/{languageId}', [LanguageStudyController::class, 'deleteTeacherLanguage']);
 
+});
+
+// Admin language management routes
+Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    Route::get('/languages', [LanguageController::class, 'index']); // List all languages
+    Route::post('/languages', [LanguageController::class, 'store']); // Create language
+    Route::get('/languages/{id}', [LanguageController::class, 'show']); // Get language details
+    Route::put('/languages/{id}', [LanguageController::class, 'update']); // Update language
+    Route::delete('/languages/{id}', [LanguageController::class, 'destroy']); // Soft delete language
+    Route::delete('/languages/{id}/force', [LanguageController::class, 'forceDestroy']); // Hard delete language
+    Route::post('/languages/{id}/restore', [LanguageController::class, 'restore']); // Restore soft-deleted language
 });
 
 // routes/api.php (temporary for testing)

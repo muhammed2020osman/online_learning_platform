@@ -12,7 +12,7 @@ class ServicesController extends Controller
 
 public function listServices()
     {
-        $services = \App\Models\Services::where('status', 1)->get();
+        $services = \App\Models\Services::where('status', 1)->get(['name_en','name_ar','id']);
         return response()->json($services);
     }
 

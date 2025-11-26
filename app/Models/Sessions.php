@@ -41,11 +41,11 @@ class Sessions extends Model
     ];
 
     protected $casts = [
-        'session_date' => 'date',
-        'start_time' => 'datetime:H:i',
-        'end_time' => 'datetime:H:i',
-        'started_at' => 'datetime',
-        'ended_at' => 'datetime',
+        'session_date' => 'date:Y-m-d',
+        'start_time' => 'date:H:i',
+        'end_time' => 'date:H:i',
+        'started_at' => 'date:H:i',
+        'ended_at' => 'date:H:i',
         'materials_shared' => 'array',
         'duration' => 'integer',
         'session_number' => 'integer',

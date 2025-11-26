@@ -222,12 +222,35 @@ class UserController extends Controller
     {
         Log::info('Update Profile Request: ', $request->all());
         $user = $request->user();
-        // update role id if frist time
-        if ($user->role_id != $request->input('role_id')) {
-            $user->role_id = $request->input('role_id');
-            $user->save();
+        
+        // Validate role_id if provided (must be 3 for teacher or 4 for student)
+        // Only allow changing role_id if it hasn't been set before (first-time setup)
+        if ($request->has('role_id')) {
+            $request->validate([
+                'role_id' => 'required|in:3,4',
+            ]);
+            
+            // Only allow updating role_id if it's currently null (first-time setup)
+            if ($user->role_id === 2 || $user->role_id === null) {
+                $user->role_id = (int)$request->input('role_id');
+                $user->save();
+                Log::info('User role set to: ' . $user->role_id);
+            } else if ($user->role_id != $request->input('role_id')) {
+                // Prevent changing role after initial setup
+                Log::warning('Attempt to change user role blocked', ['user_id' => $user->id]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot change role after initial setup'
+                ], 422);
+            }
+        } elseif ($user->role_id === null) {
+            // role_id is required if not already set
+            return response()->json([
+                'success' => false,
+                'message' => 'role_id is required for first-time profile setup',
+                'errors' => ['role_id' => ['The role_id field is required.']]
+            ], 422);
         }
-        Log::info('User role updated to: ' . $user->role_id);
         $profileData = $request->only(['bio', 'description', 'profile_photo_id', 'language_pref', 'terms_accepted']);
         $profileData['verified'] = $user->role_id == 4 ? 1 : ($request->input('verified', 0));
 
@@ -593,6 +616,7 @@ class UserController extends Controller
                 return [
                     'id' => $teacherSubject->id,
                     'teacher_id' => $teacherSubject->teacher_id,
+                    'subject_id' => optional($teacherSubject->subject)->id ?? $teacherSubject->subject_id,
                     'title' => $teacherSubject->subject->name_ar ?? $teacherSubject->subject->name_en,
                     'class_id' => $teacherSubject->subject->class_id,
                     'class_level_id' => $teacherSubject->subject->education_level_id,
@@ -731,5 +755,19 @@ class UserController extends Controller
             ]);
             throw $e;
         }
+    }
+
+    public function listCertificates(Request $request)
+    {
+        $user = $request->user();
+
+        $certificates = Attachment::where('user_id', $user->id)
+            ->where('attached_to_type', 'certificate')
+            ->get(['id', 'file_name', 'file_path', 'created_at']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $certificates
+        ]);
     }
 }

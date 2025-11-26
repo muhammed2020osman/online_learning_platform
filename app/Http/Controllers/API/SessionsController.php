@@ -157,12 +157,40 @@ class SessionsController extends Controller
             }
         }
 
+        // Normalize session date to Y-m-d and provide day info
+        $rawDate = $session->session_date;
+        try {
+            if ($rawDate instanceof \Carbon\Carbon) {
+                $sessionDateFormatted = $rawDate->format('Y-m-d');
+                $dayNumber = $rawDate->dayOfWeek; // 0 (Sunday) .. 6 (Saturday)
+                $dayName = $rawDate->format('l');
+            } else {
+                $dt = \Carbon\Carbon::parse((string) $rawDate);
+                $sessionDateFormatted = $dt->format('Y-m-d');
+                $dayNumber = $dt->dayOfWeek;
+                $dayName = $dt->format('l');
+            }
+        } catch (\Exception $e) {
+            // Fallback: take first 10 chars
+            $sessionDateFormatted = substr((string) $rawDate, 0, 10);
+            try {
+                $dt = \Carbon\Carbon::parse($sessionDateFormatted);
+                $dayNumber = $dt->dayOfWeek;
+                $dayName = $dt->format('l');
+            } catch (\Exception $ex) {
+                $dayNumber = null;
+                $dayName = null;
+            }
+        }
+
         return [
             'id' => $session->id,
             'booking_id' => $session->booking_id,
             'session_number' => $session->session_number,
             'session_title' => $session->session_title,
-            'session_date' => $session->session_date,
+            'session_date' => $sessionDateFormatted,
+            'day_name' => $dayName,
+            'day_number' => $dayNumber,
             'start_time' => $session->start_time instanceof \Carbon\Carbon 
                 ? $session->start_time->format('H:i:s') 
                 : $session->start_time,

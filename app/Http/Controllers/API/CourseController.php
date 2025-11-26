@@ -7,24 +7,17 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Booking;
-use App\Models\Subject;
+use App\Models\Services;
 
 class CourseController extends Controller
 {
     // Student: Browse all published courses
     public function index(Request $request): JsonResponse
     {
-        $service_id = $request->input('service_id');
-        $subject_id = Subject::where('service_id', $service_id)->value('id');
-        if (!$subject_id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No subjects found for this service'
-            ], 404);
-        }
-        // Get all courses for this subject/service
+        $service_id = 4;
+        // Get all courses for this service
         $courses = Course::with(['teacher', 'category', 'coverImage'])
-            ->where('subject_id', $subject_id)
+            ->where('service_id', $service_id)
             ->where('status', 'published')
             ->get();
 
@@ -135,7 +128,7 @@ class CourseController extends Controller
     {
         $request->validate([
             'category_id' => 'nullable|exists:course_categories,id',
-            'subject_id' => 'nullable|exists:subjects,id',
+            'service_id' => 'required|exists:services,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:5000',
             'course_type' => 'required|in:single,package,subscription',
@@ -151,7 +144,7 @@ class CourseController extends Controller
         $course = Course::create([
             'teacher_id' => $request->user()->id,
             'category_id' => $request->input('category_id'),
-            'subject_id' => $request->input('subject_id'),
+            'service_id' => $request->input('service_id'),
             'name' => $request->input('name'),
             'description' => $request->input('description'),
             'course_type' => $request->input('course_type'),
@@ -187,7 +180,7 @@ class CourseController extends Controller
     {
         $request->validate([
             'category_id' => 'nullable|exists:course_categories,id',
-            'subject_id' => 'nullable|exists:subjects,id',
+            'service_id' => 'required|exists:services,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:5000',
             'course_type' => 'required|in:single,package,subscription',
@@ -204,7 +197,7 @@ class CourseController extends Controller
             ->findOrFail($id);
 
         $course->update($request->only([
-            'category_id', 'subject_id', 'name', 'description',
+            'category_id', 'service_id', 'name', 'description',
             'course_type', 'price', 'duration_hours', 'status', 'cover_image_id'
         ]));
 

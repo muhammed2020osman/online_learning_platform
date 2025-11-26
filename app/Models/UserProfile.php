@@ -29,7 +29,19 @@ class UserProfile extends Model
 
     public function profilePhoto(): BelongsTo
     {
-        $profilePhotoPath = Attachment::find($this->user_id)->file_path ?? null;
-        return $profilePhotoPath;
+        // The profile photo is stored in the `attachments` table and the
+        // `profile_photo_id` column on this model holds the attachment id.
+        // Return the Eloquent relation so callers expecting a BelongsTo
+        // relation don't receive null or a string.
+        return $this->belongsTo(Attachment::class, 'profile_photo_id');
+    }
+
+    // Convenience accessor to get the profile photo URL (if needed elsewhere)
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        if ($this->profilePhoto && $this->profilePhoto->file_path) {
+            return asset('storage/' . $this->profilePhoto->file_path);
+        }
+        return null;
     }
 }

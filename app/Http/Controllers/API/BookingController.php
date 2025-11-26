@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Carbon\Carbon;
 
 class BookingController extends Controller
@@ -309,24 +310,169 @@ class BookingController extends Controller
     }
 
     /**
-     * Pay for a pending booking using card
-     * POST /api/student/booking/{bookingId}/pay
+     * Payment callback - verify payment after OTP/3DS redirect
+     * GET /api/student/booking/payment-callback?resourcePath=xxx
+     * 
+     * HyperPay redirects here after user completes OTP
      */
-    public function payBooking(Request $request): JsonResponse
+    public function paymentCallback(Request $request): JsonResponse
+    {
+        $resourcePath = $request->get('resourcePath');
+        $checkoutId = $request->get('checkoutId');
+
+        if (!$resourcePath && !$checkoutId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing resourcePath or checkoutId'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Get payment status from HyperPay
+            $hyperpayService = app(\App\Services\HyperpayService::class);
+            
+            if ($checkoutId) {
+                $statusResponse = $hyperpayService->getPaymentStatus($checkoutId);
+            } else {
+                // If using resourcePath, construct full URL
+                $baseUrl = config('hyperpay.base_url');
+                $statusResponse = Http::withHeaders([
+                    'Authorization' => config('hyperpay.authorization'),
+                    'Accept' => 'application/json',
+                ])->get($baseUrl . $resourcePath);
+            }
+
+            $statusData = $statusResponse->json();
+
+            Log::info('Payment verification response', [
+                'status_code' => $statusResponse->status(),
+                'checkout_id' => $checkoutId,
+                'response_code' => $statusData['result']['code'] ?? 'unknown',
+                'description' => $statusData['result']['description'] ?? 'unknown',
+            ]);
+
+            // Extract merchant transaction ID to find payment
+            $merchantTransactionId = $statusData['merchantTransactionId'] ?? null;
+            
+            if (!$merchantTransactionId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot find transaction reference in response'
+                ], 400);
+            }
+
+            // Find payment by transaction reference
+            $payment = Payment::where('transaction_reference', $merchantTransactionId)
+                             ->with('booking')
+                             ->firstOrFail();
+
+            $booking = $payment->booking;
+
+            // Update payment with gateway response
+            $payment->update([
+                'gateway_response' => json_encode($statusData),
+            ]);
+
+            // Check result code
+            $resultCode = $statusData['result']['code'] ?? '';
+            $resultDescription = $statusData['result']['description'] ?? 'Unknown error';
+
+            // Success codes start with 000
+            if (str_starts_with($resultCode, '000.')) {
+                // Payment successful after OTP
+                $payment->update([
+                    'status' => 'paid',
+                    'paid_at' => now(),
+                ]);
+
+                // Update booking status to confirmed
+                $booking->update(['status' => Booking::STATUS_CONFIRMED]);
+
+                // Create sessions for the booking
+                Sessions::createForBooking($booking);
+
+                // Schedule meeting generation jobs
+                $this->scheduleSessionMeetingJobs($booking);
+
+                DB::commit();
+
+                Log::info('Payment verified successfully after OTP', [
+                    'booking_id' => $booking->id,
+                    'payment_id' => $payment->id,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment verified and confirmed',
+                    'data' => [
+                        'booking_id' => $booking->id,
+                        'booking_reference' => $booking->booking_reference,
+                        'payment_id' => $payment->id,
+                        'transaction_reference' => $payment->transaction_reference,
+                        'status' => 'confirmed',
+                        'amount_paid' => $booking->total_amount,
+                        'currency' => $booking->currency,
+                    ]
+                ], 200);
+            } else {
+                // Payment failed
+                $payment->update(['status' => 'failed']);
+                DB::commit();
+
+                Log::warning('Payment verification failed', [
+                    'booking_id' => $booking->id,
+                    'payment_id' => $payment->id,
+                    'error_code' => $resultCode,
+                    'error_description' => $resultDescription,
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment verification failed',
+                    'error' => $resultDescription,
+                    'error_code' => $resultCode,
+                    'data' => [
+                        'payment_id' => $payment->id,
+                        'booking_id' => $booking->id,
+                    ]
+                ], 400);
+            }
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment record not found'
+            ], 404);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Payment callback error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment verification failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Pay for a pending booking using 3DS checkout
+     * POST /api/student/booking/{bookingId}/pay-3ds
+     */
+    public function payBooking3DS(Request $request): JsonResponse
     {
         $studentId = auth()->id();
         
-        // Validate card payment details
-        $currentYear = Carbon::now()->year;
         $request->validate([
             'booking_id' => 'required|exists:bookings,id',
-            'card_number' => 'required|regex:/^\d{13,19}$/',
-            'card_holder' => 'required|string|max:100',
-            'expiry_month' => 'required|integer|between:1,12',
-            'expiry_year' => 'required|integer|min:' . $currentYear,
-            'cvv' => 'required|regex:/^\d{3,4}$/',
             'payment_brand' => 'required|in:VISA,MASTER,MADA',
+            'return_url' => 'nullable|url', // Frontend callback URL
         ]);
+
         $bookingId = $request->booking_id;
         DB::beginTransaction();
         try {
@@ -345,7 +491,182 @@ class BookingController extends Controller
                 ], 400);
             }
 
-            Log::info('Payment attempt for booking', [
+            Log::info('3DS payment initiation', [
+                'booking_id' => $bookingId,
+                'student_id' => $studentId,
+                'amount' => $booking->total_amount,
+                'currency' => $booking->currency,
+            ]);
+
+            // Create payment record
+            $payment = Payment::create([
+                'booking_id' => $bookingId,
+                'student_id' => $studentId,
+                'teacher_id' => $booking->teacher_id,
+                'amount' => $booking->total_amount,
+                'currency' => $booking->currency,
+                'payment_method' => $request->payment_brand,
+                'status' => 'pending',
+                'transaction_reference' => $this->generateTransactionReference(),
+                'gateway_reference' => null,
+                'gateway_response' => null,
+                'paid_at' => null,
+            ]);
+
+            Log::info('Payment record created', [
+                'payment_id' => $payment->id,
+                'transaction_reference' => $payment->transaction_reference,
+            ]);
+
+            // Prepare 3DS checkout payload
+            $hyperpayService = app(\App\Services\HyperpayService::class);
+            
+            $callbackUrl = $request->return_url ?? route('api.payment.callback');
+
+            $payload = [
+                'amount' => number_format($booking->total_amount, 2, '.', ''),
+                'currency' => strtoupper($booking->currency),
+                'paymentType' => 'DB', // Debit (direct charge)
+                'paymentBrand' => $request->payment_brand,
+                'merchantTransactionId' => $payment->transaction_reference,
+                'shopperResultUrl' => $callbackUrl,
+                'customer.email' => $booking->student ? $booking->student->email : 'student@ewan.com',
+                'customer.givenName' => $booking->student ? $booking->student->first_name : 'Student',
+                'customer.surname' => $booking->student ? $booking->student->last_name : 'User',
+                'billing.city' => 'Riyadh',
+                'billing.country' => 'SA',
+                'customParameters[booking_id]' => $bookingId,
+                'customParameters[payment_id]' => $payment->id,
+            ];
+
+            Log::info('3DS checkout payload prepared', [
+                'payment_id' => $payment->id,
+                'amount' => $payload['amount'],
+                'currency' => $payload['currency'],
+                'brand' => $payload['paymentBrand'],
+            ]);
+
+            // Call HyperPay 3DS checkout
+            $checkoutResponse = $hyperpayService->create3DSCheckout($payload);
+            $responseData = $checkoutResponse->json();
+
+            Log::info('3DS checkout response', [
+                'payment_id' => $payment->id,
+                'status_code' => $checkoutResponse->status(),
+                'checkout_id' => $responseData['id'] ?? 'unknown',
+                'redirect_url' => $responseData['redirectUrl'] ?? 'none',
+            ]);
+
+            // Update payment with gateway reference
+            $payment->update([
+                'gateway_reference' => $responseData['id'] ?? null,
+                'gateway_response' => json_encode($responseData),
+            ]);
+
+            // Check if checkout was successful
+            if ($checkoutResponse->successful() && isset($responseData['redirectUrl'])) {
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Checkout created. Redirect to payment page.',
+                    'data' => [
+                        'payment_id' => $payment->id,
+                        'checkout_id' => $responseData['id'],
+                        'redirect_url' => $responseData['redirectUrl'], // Frontend should redirect here
+                        'transaction_reference' => $payment->transaction_reference,
+                        'booking_id' => $booking->id,
+                    ]
+                ], 200);
+            } else {
+                $payment->update(['status' => 'failed']);
+                DB::commit();
+
+                $resultCode = $responseData['result']['code'] ?? 'unknown';
+                $resultDescription = $responseData['result']['description'] ?? 'Failed to create checkout';
+
+                Log::error('3DS checkout failed', [
+                    'payment_id' => $payment->id,
+                    'error_code' => $resultCode,
+                    'error_description' => $resultDescription,
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create checkout',
+                    'error' => $resultDescription,
+                    'error_code' => $resultCode,
+                    'data' => [
+                        'payment_id' => $payment->id,
+                        'booking_id' => $bookingId,
+                    ]
+                ], 400);
+            }
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Booking not found'
+            ], 404);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('3DS payment initiation error', [
+                'booking_id' => $bookingId ?? null,
+                'student_id' => $studentId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment initiation failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Pay for a pending booking using card (Direct Payment with OTP redirect)
+     * POST /api/student/booking/{bookingId}/pay
+     * 
+     * Request: card details + booking info
+     * Response: redirect URL for OTP/3DS or success if already verified
+     */
+    public function payBooking(Request $request): JsonResponse
+    {
+        $studentId = auth()->id();
+        
+        // Validate card payment details
+        $currentYear = Carbon::now()->year;
+        $request->validate([
+            'booking_id' => 'required|exists:bookings,id',
+            'card_number' => 'required|regex:/^\d{13,19}$/',
+            'card_holder' => 'required|string|max:100',
+            'expiry_month' => 'required|integer|between:1,12',
+            'expiry_year' => 'required|integer|min:' . $currentYear,
+            'cvv' => 'required|regex:/^\d{3,4}$/',
+            'payment_brand' => 'required|in:VISA,MASTER,MADA',
+        ]);
+        
+        $bookingId = $request->booking_id;
+        DB::beginTransaction();
+        try {
+            // Fetch booking with validation
+            $booking = Booking::where('id', $bookingId)
+                             ->where('student_id', $studentId)
+                             ->with('teacher')
+                             ->firstOrFail();
+
+            // Check booking status
+            if ($booking->status !== Booking::STATUS_PENDING_PAYMENT) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Booking is not awaiting payment',
+                    'current_status' => $booking->status
+                ], 400);
+            }
+
+            Log::info('Direct payment attempt for booking', [
                 'booking_id' => $bookingId,
                 'student_id' => $studentId,
                 'amount' => $booking->total_amount,
@@ -373,7 +694,7 @@ class BookingController extends Controller
                 'transaction_reference' => $payment->transaction_reference,
             ]);
 
-            // Prepare HyperPay payload
+            // Prepare HyperPay payload with card details
             $hyperpayService = app(\App\Services\HyperpayService::class);
             
             $payload = [
@@ -385,7 +706,7 @@ class BookingController extends Controller
                 'shopperResultUrl' => route('api.payment.result'),
                 'card.number' => $request->card_number,
                 'card.holder' => $request->card_holder,
-                'card.expiryMonth' => $request->expiry_month,
+                'card.expiryMonth' => str_pad($request->expiry_month, 2, '0', STR_PAD_LEFT),
                 'card.expiryYear' => $request->expiry_year,
                 'card.cvv' => $request->cvv,
                 'customer.email' => $booking->student ? $booking->student->email : 'student@ewan.com',
@@ -403,15 +724,17 @@ class BookingController extends Controller
                 'brand' => $payload['paymentBrand'],
             ]);
 
-            // Call HyperPay API
-            $hyperpayResponse = $hyperpayService->directPayment($payload);
+            // Call HyperPay API (prepareCheckout handles the POST)
+            $hyperpayResponse = $hyperpayService->prepareCheckout($payload);
             $responseData = $hyperpayResponse->json();
 
             Log::info('HyperPay response received', [
                 'payment_id' => $payment->id,
                 'status_code' => $hyperpayResponse->status(),
+                'response_id' => $responseData['id'] ?? 'unknown',
                 'response_code' => $responseData['result']['code'] ?? 'unknown',
                 'response_description' => $responseData['result']['description'] ?? 'unknown',
+                'full_response' => json_encode($responseData), // Log full response for debugging
             ]);
 
             // Update payment with gateway response
@@ -420,55 +743,95 @@ class BookingController extends Controller
                 'gateway_response' => json_encode($responseData),
             ]);
 
-            // Check if payment was successful (HyperPay codes starting with 000. = success)
+            // Check the response code
             $resultCode = $responseData['result']['code'] ?? '';
             $resultDescription = $responseData['result']['description'] ?? 'Unknown error';
 
+            // **DEBUG: Return raw HyperPay response for testing**
+            // Remove this after testing - it shows the actual HyperPay response
+            return response()->json([
+                'success' => false,
+                'message' => 'DEBUG: Raw HyperPay Response (remove after testing)',
+                'hyperpay_response' => $responseData,
+                'status_code' => $hyperpayResponse->status(),
+                'result_code' => $resultCode,
+                'result_description' => $resultDescription,
+            ], 200);
+
+            // Success codes start with 000
             if (str_starts_with($resultCode, '000.')) {
-                // Payment successful
-                $payment->update([
-                    'status' => 'paid',
-                    'paid_at' => now(),
-                ]);
+                // Check if there's a redirect URL for OTP/3DS
+                $redirectUrl = $responseData['redirect']['url'] ?? 
+                              $responseData['redirectUrl'] ?? 
+                              null;
 
-                // Update booking status to confirmed
-                $booking->update(['status' => Booking::STATUS_CONFIRMED]);
+                if ($redirectUrl) {
+                    // Payment requires OTP/3DS verification
+                    DB::commit();
 
-                // Create sessions for the booking
-                Sessions::createForBooking($booking);
+                    Log::info('OTP/3DS redirect required', [
+                        'payment_id' => $payment->id,
+                        'redirect_url' => $redirectUrl,
+                    ]);
 
-                // Schedule meeting generation jobs (if applicable)
-                $this->scheduleSessionMeetingJobs($booking);
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Card validated. OTP/3DS verification required.',
+                        'requires_otp' => true,
+                        'redirect_url' => $redirectUrl,
+                        'data' => [
+                            'payment_id' => $payment->id,
+                            'transaction_reference' => $payment->transaction_reference,
+                            'booking_id' => $booking->id,
+                            'gateway_reference' => $responseData['id'],
+                        ]
+                    ], 200);
+                } else {
+                    // Payment successful without OTP (rare case)
+                    $payment->update([
+                        'status' => 'paid',
+                        'paid_at' => now(),
+                    ]);
 
-                DB::commit();
+                    // Update booking status to confirmed
+                    $booking->update(['status' => Booking::STATUS_CONFIRMED]);
 
-                Log::info('Payment successful, booking confirmed', [
-                    'booking_id' => $bookingId,
-                    'payment_id' => $payment->id,
-                    'transaction_reference' => $payment->transaction_reference,
-                ]);
+                    // Create sessions for the booking
+                    Sessions::createForBooking($booking);
 
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Payment successful. Booking confirmed.',
-                    'data' => [
-                        'booking_id' => $booking->id,
-                        'booking_reference' => $booking->booking_reference,
+                    // Schedule meeting generation jobs (if applicable)
+                    $this->scheduleSessionMeetingJobs($booking);
+
+                    DB::commit();
+
+                    Log::info('Payment successful without OTP', [
+                        'booking_id' => $bookingId,
                         'payment_id' => $payment->id,
                         'transaction_reference' => $payment->transaction_reference,
-                        'status' => 'confirmed',
-                        'amount_paid' => $booking->total_amount,
-                        'currency' => $booking->currency,
-                        'payment_method' => $request->payment_brand,
-                        'first_session_date' => $booking->first_session_date,
-                    ]
-                ], 200);
+                    ]);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Payment successful. Booking confirmed.',
+                        'data' => [
+                            'booking_id' => $booking->id,
+                            'booking_reference' => $booking->booking_reference,
+                            'payment_id' => $payment->id,
+                            'transaction_reference' => $payment->transaction_reference,
+                            'status' => 'confirmed',
+                            'amount_paid' => $booking->total_amount,
+                            'currency' => $booking->currency,
+                            'payment_method' => $request->payment_brand,
+                            'first_session_date' => $booking->first_session_date,
+                        ]
+                    ], 200);
+                }
             } else {
-                // Payment failed
+                // Payment failed or card rejected
                 $payment->update(['status' => 'failed']);
                 DB::commit();
 
-                Log::warning('Payment failed', [
+                Log::warning('Payment failed at HyperPay', [
                     'booking_id' => $bookingId,
                     'payment_id' => $payment->id,
                     'error_code' => $resultCode,
@@ -497,7 +860,7 @@ class BookingController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Payment processing error', [
-                'booking_id' => $bookingId,
+                'booking_id' => $bookingId ?? null,
                 'student_id' => $studentId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -509,6 +872,7 @@ class BookingController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Schedule meeting generation jobs for all sessions in a booking
