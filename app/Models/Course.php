@@ -32,10 +32,6 @@ class Course extends Model
     {
         return $this->hasMany(AvailabilitySlot::class, 'course_id');
     }
-    public function courselessons()
-    {
-        return $this->hasMany(CourseLesson::class, 'course_id');
-    }
     public function coverImage()
     {
         return $this->morphOne(Attachment::class, 'attached_to');
@@ -93,9 +89,12 @@ class Course extends Model
 
     public function countstudents()
     {
-        return $this->hasManyThrough(Booking::class, CourseLesson::class, 'course_id', 'lesson_id', 'id', 'id')
-            ->where('status', 'confirmed') // or whatever status means "paid"
-            ->distinct('student_id');
+        // The previous implementation used a hasManyThrough via CourseLesson -> Booking
+        // but some deployments don't store a `lesson_id` on `bookings` (bookings may reference course_id or sessions instead).
+        // To avoid SQL errors when `bookings.lesson_id` doesn't exist, use a direct bookings relation filtered by course_id.
+        // This returns confirmed bookings for this course. If you need a distinct student count, compute it with a query using COUNT(DISTINCT student_id).
+        return $this->hasMany(Booking::class, 'course_id', 'id')
+            ->where('status', 'confirmed'); // or whatever status means "paid"
     }
 
     // Courses for language service (individual and group)

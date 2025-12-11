@@ -3,9 +3,11 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Course;
+use App\Models\Attachment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\Booking;
 use App\Models\Services;
 
@@ -104,13 +106,19 @@ class CourseController extends Controller
             ], 400);
         }
 
-        // Enroll student
-        DB::table('course_student')->insert([
+        // Enroll student with pending status (if the pivot supports status column)
+        $insert = [
             'course_id' => $id,
             'user_id' => $user->id,
             'created_at' => now(),
-            'updated_at' => now()
-        ]);
+            'updated_at' => now(),
+        ];
+
+        if (Schema::hasColumn('course_student', 'status')) {
+            $insert['status'] = 'pending';
+        }
+
+        DB::table('course_student')->insert($insert);
 
         return response()->json([
             'success' => true,
@@ -124,54 +132,133 @@ class CourseController extends Controller
 /////////////////////////////////////////////////////////////////////////////////////////////
 
     // Teacher: Create new course
-    public function store(Request $request): JsonResponse
+    public function  store(Request $request): JsonResponse
     {
+        // New store behavior:
+        // - accept course data (name, price, duration_hours, description, category_id, status)
+        // - accept cover_image file and save as Attachment
+        // - accept available_slots in the same shape as teacher availability: [{ day: 1..7, times: ['09:00','2:00 PM'] }, ...]
+        // - prevent creating course slots that conflict with the teacher's existing (personal) slots
+
         $request->validate([
             'category_id' => 'nullable|exists:course_categories,id',
-            'service_id' => 'required|exists:services,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:5000',
             'course_type' => 'required|in:single,package,subscription',
             'price' => 'nullable|numeric|min:0|max:999999.99',
             'duration_hours' => 'nullable|integer|min:1|max:1000',
             'status' => 'required|in:draft,published',
-            'cover_image_id' => 'nullable|exists:attachments,id',
+            'cover_image' => 'nullable|file|image|max:4096',
             'available_slots' => 'required|array',
-            'available_slots.*.day' => 'required|date_format:Y-m-d',
-            'available_slots.*.time_start' => 'required|date_format:H:i',
+            // each available_slots entry should be { day: int(1..7), times: [string,...] }
         ]);
 
+        $service = Services::where('name_en', 'Course')->first();
+        $service_id = $service ? $service->id : null;
+
+        $teacherId = $request->user()->id;
+
+        // Validate structure of available_slots and parse times
+        $timeFormats = ['g:i A', 'h:i A', 'H:i', 'G:i'];
+
+        $parsedSlots = [];
+        foreach ($request->available_slots as $entry) {
+            $day = $entry['day'] ?? $entry['day_number'] ?? null;
+            if (!is_numeric($day) || (int)$day < 1 || (int)$day > 7) {
+                return response()->json(['success' => false, 'message' => 'Each available_slots entry must include a valid day (1..7)'], 422);
+            }
+            if (!isset($entry['times']) || !is_array($entry['times'])) {
+                return response()->json(['success' => false, 'message' => 'Each available_slots entry must include a times array'], 422);
+            }
+
+            foreach ($entry['times'] as $timeStr) {
+                $timeStr = trim($timeStr);
+                $parsed = null;
+                foreach ($timeFormats as $fmt) {
+                    try {
+                        $parsed = \Carbon\Carbon::createFromFormat($fmt, $timeStr);
+                        if ($parsed) break;
+                    } catch (\Exception $e) {
+                        // continue trying formats
+                    }
+                }
+                if (!$parsed) {
+                    return response()->json(['success' => false, 'message' => "Invalid time format: {$timeStr}"], 422);
+                }
+
+                $startTime = $parsed->format('H:i');
+                $endTime = $parsed->copy()->addHour()->format('H:i');
+
+                // Check teacher's existing personal slots (those saved with no course_id) for exact start_time conflicts on the same day
+                $conflict = \App\Models\AvailabilitySlot::where('teacher_id', $teacherId)
+                    ->whereNull('course_id')
+                    ->where('day_number', (int)$day)
+                    ->where('start_time', $startTime)
+                    ->exists();
+
+                if ($conflict) {
+                    return response()->json(['success' => false, 'message' => "Cannot add course slot: teacher already has a personal slot on day {$day} at {$startTime}"], 422);
+                }
+
+                $parsedSlots[] = [
+                    'day_number' => (int)$day,
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                ];
+            }
+        }
+
+        // Create the course
         $course = Course::create([
-            'teacher_id' => $request->user()->id,
+            'teacher_id' => $teacherId,
             'category_id' => $request->input('category_id'),
-            'service_id' => $request->input('service_id'),
+            'service_id' => $service_id,
             'name' => $request->input('name'),
             'description' => $request->input('description'),
             'course_type' => $request->input('course_type'),
             'price' => $request->input('price'),
             'duration_hours' => $request->input('duration_hours'),
             'status' => $request->input('status'),
-            'cover_image_id' => $request->input('cover_image_id'),
         ]);
 
-        // Save availability slots
-        foreach ($request->available_slots as $slot) {
-            $day = "{$slot['day']}";
-            $start = "{$slot['time_start']}:00";
-            $end = \Carbon\Carbon::parse($start)->addHour()->format('Y-m-d H:i:s');
-            $course->availability_slots()->create([
-                'teacher_id' => $request->user()->id,
-                'day' => $day,
-                'start_time' => $start,
-                'end_time' => $end,
+        // Handle cover image upload (store in public disk and create Attachment)
+        if ($request->hasFile('cover_image')) {
+            $file = $request->file('cover_image');
+            $path = $file->store('course_covers', 'public');
+            $fileUrl = asset('storage/' . $path);
+
+            $attachment = Attachment::create([
+                'user_id' => $teacherId,
+                'file_path' => $fileUrl,
+                'file_name' => $file->getClientOriginalName(),
+                'file_type' => $file->getClientMimeType(),
+                'file_size' => $file->getSize(),
+            ]);
+
+            // Link attachment id to course (courses table uses cover_image_id in other code)
+            $course->cover_image_id = $attachment->id;
+            $course->save();
+        }
+
+        // Create availability slots for the course
+        foreach ($parsedSlots as $slot) {
+            $course->availabilitySlots()->create([
+                'teacher_id' => $teacherId,
+                'course_id' => $course->id,
+                'day_number' => $slot['day_number'],
+                'start_time' => $slot['start_time'],
+                'end_time' => $slot['end_time'],
+                'is_available' => true,
                 'is_booked' => false,
             ]);
         }
 
+        // If the course was marked as published, you may want to set a published_at timestamp here.
+
         return response()->json([
             'success' => true,
             'message' => 'Course created successfully',
-            'data' => $course->load('availability_slots')
+            'data' => $course->load('availabilitySlots')
         ], 201);
     }
 
@@ -273,6 +360,17 @@ class CourseController extends Controller
         return response()->json([
             'success' => true,
             'data' => $courses
+        ]);
+    }
+
+
+    public function listCategories(): JsonResponse
+    {
+        $categories = \App\Models\CourseCategory::all();
+
+        return response()->json([
+            'success' => true,
+            'data' => $categories
         ]);
     }
 

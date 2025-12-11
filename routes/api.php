@@ -25,8 +25,17 @@ use App\Http\Controllers\API\SessionsController;
 use App\Http\Controllers\API\LanguageStudyController;
 use App\Http\Controllers\API\LanguageController;
 use App\Http\Controllers\FCMTokenController;
+use App\Http\Controllers\API\Admin\DashboardController;
+use App\Http\Controllers\API\Admin\UsersController;
+use App\Http\Controllers\API\Admin\PayoutAdminController;
+use App\Http\Controllers\API\Admin\SystemController;
+use App\Http\Controllers\API\Admin\ServiceController;
+use App\Http\Controllers\API\Admin\GalleryController;
+use App\Http\Controllers\API\Admin\DisputeAdminController;
+use App\Http\Controllers\API\Admin\BookingAdminController;
+use App\Http\Controllers\API\Admin\PaymentAdminController;
 use App\Models\Payment;
-
+use App\Models\User;
 // Agora token route for sessions
 use App\Services\AgoraService;
 use Illuminate\Support\Facades\Lang;
@@ -86,6 +95,7 @@ Route::get('/services', [ServicesController::class, 'listServices']);
 Route::get('/services/search', [ServicesController::class, 'searchServices']);
 Route::get('/subjects/{id}', [ServicesController::class, 'listSubjects']);
 Route::get('/subjects/{id}', [ServicesController::class, 'subjectDetails']);
+Route::get('categories', [CourseController::class, 'listCategories']);
 Route::get('courses', [CourseController::class, 'index']); // browse/search
 Route::get('courses/{id}', [CourseController::class, 'show']); // course details
 Route::get('language-study',[LanguageStudyController::class,'index']);
@@ -203,6 +213,11 @@ Route::prefix('student')->middleware(['auth:sanctum', 'role:student'])->group(fu
 });
 
 Route::prefix('teacher')->middleware(['auth:sanctum', 'role:teacher'])->group(function () {
+    Route::get('/education-levels', [EducationLevelController::class, 'levelsWithClassesAndSubjects']);
+    Route::get('/classes/{education_level_id}', [EducationLevelController::class, 'classes']);
+    Route::get('subjectsClasses/{class_id}', [EducationLevelController::class, 'getSubjectsByClass']);
+    Route::get('banks', [PaymentMethodController::class, 'banks']);
+
     // fcm token
     Route::post('/save-fcm-token', [FCMTokenController::class, 'save']);
     // Teacher Information
@@ -303,4 +318,64 @@ Route::put('admin/payments/{payment}/complete', function(Payment $payment) {
             ];
         })
     ]);
+});
+
+// ======================
+// Admin routes
+// ======================
+Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    // Dashboard / system
+    Route::get('/stats', [DashboardController::class, 'stats']);
+    Route::get('/health', [DashboardController::class, 'health']);
+
+    // Users management
+    Route::get('/users', [UsersController::class, 'index']);
+    Route::get('/users/{id}', [UsersController::class, 'show']);
+    Route::post('/users', [UsersController::class, 'store']); // create admin user or seed
+    Route::put('/users/{id}', [UsersController::class, 'update']);
+    Route::delete('/users/{id}', [UsersController::class, 'destroy']);
+    Route::get('/teachers' ,[UsersController::class, 'teachers']);
+    Route::get('/teachers/{id}', [UsersController::class, 'teacherDetails']);
+
+    // User actions: reset password, verify teacher, suspend/activate
+    Route::put('/users/{id}/reset-password', [UsersController::class, 'resetPassword']);
+    Route::put('/users/{id}/verify-teacher', [UsersController::class, 'verifyTeacher']);
+    Route::put('/users/{id}/suspend', [UsersController::class, 'suspend']);
+    Route::put('/users/{id}/activate', [UsersController::class, 'activate']);
+
+    // Bookings & payments
+    Route::get('/bookings', [BookingAdminController::class, 'index']);
+    Route::get('/bookings/{id}', [BookingAdminController::class, 'show']);
+    Route::post('/bookings/{id}/mark-paid', [BookingAdminController::class, 'markPaid']);
+    Route::post('/bookings/{id}/refund', [BookingAdminController::class, 'refund']);
+
+    Route::get('/payments', [PaymentAdminController::class, 'index']);
+    Route::get('/payments/{id}', [PaymentAdminController::class, 'show']);
+    Route::post('/payments/{id}/reconcile', [PaymentAdminController::class, 'reconcile']);
+
+    // Disputes
+    Route::get('/disputes', [DisputeAdminController::class, 'index']);
+    Route::get('/disputes/{id}', [DisputeAdminController::class, 'show']);
+    Route::post('/disputes/{id}/resolve', [DisputeAdminController::class, 'resolve']);
+
+    // Payouts / transfer to teachers
+    Route::get('/payouts', [PayoutAdminController::class, 'index']);
+    Route::post('/payouts', [PayoutAdminController::class, 'store']);
+    Route::post('/payouts/{id}/mark-sent', [PayoutAdminController::class, 'markSent']);
+
+    // Services management
+    Route::get('/services', [ServiceController::class, 'index']);
+    Route::post('/services', [ServiceController::class, 'store']);
+    Route::put('/services/{id}', [ServiceController::class, 'update']);
+    Route::delete('/services/{id}', [ServiceController::class, 'destroy']);
+
+    // Gallery / media control
+    Route::get('/gallery', [GalleryController::class, 'index']);
+    Route::post('/gallery', [GalleryController::class, 'store']);
+    Route::delete('/gallery/{id}', [GalleryController::class, 'destroy']);
+
+    // Misc admin tasks
+    Route::post('/run-scheduler', [SystemController::class, 'runScheduler']);
+    Route::post('/clear-cache', [SystemController::class, 'clearCache']);
+    
 });

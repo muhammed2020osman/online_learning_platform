@@ -15,6 +15,7 @@ use App\Models\TeacherSubject;
 use App\Models\Attachment;
 use App\Models\TeacherServices;
 use App\Models\AvailabilitySlot;
+use App\Models\TeacherLanguage;
 use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
@@ -222,14 +223,14 @@ class UserController extends Controller
     {
         Log::info('Update Profile Request: ', $request->all());
         $user = $request->user();
-        
+
         // Validate role_id if provided (must be 3 for teacher or 4 for student)
         // Only allow changing role_id if it hasn't been set before (first-time setup)
         if ($request->has('role_id')) {
             $request->validate([
                 'role_id' => 'required|in:3,4',
             ]);
-            
+
             // Only allow updating role_id if it's currently null (first-time setup)
             if ($user->role_id === 2 || $user->role_id === null) {
                 $user->role_id = (int)$request->input('role_id');
@@ -568,6 +569,167 @@ class UserController extends Controller
         ]);
     }
 
+    // public function getFullTeacherData(User $teacher)
+    // {
+    //     // Get latest attachments
+    //     $profilePhoto = $teacher->attachments()
+    //         ->where('attached_to_type', 'profile_picture')
+    //         ->latest()
+    //         ->value('file_path');
+
+    //     // Get earnings data
+    //     $earnings = DB::table('bookings')
+    //         ->where('teacher_id', $teacher->id)
+    //         ->where('status', 'completed')
+    //         ->select(
+    //             DB::raw('COUNT(*) as total_lessons'),
+    //             DB::raw('SUM(total_amount) as total_earnings'),
+    //             DB::raw('SUM(CASE WHEN DATE(created_at) = CURDATE() THEN total_amount ELSE 0 END) as today_earnings'),
+    //             DB::raw('SUM(CASE WHEN MONTH(created_at) = MONTH(CURDATE()) THEN total_amount ELSE 0 END) as month_earnings')
+    //         )
+    //         ->first();
+
+    //     // Current lessons count
+    //     $currentLessons = DB::table('bookings')
+    //         ->where('teacher_id', $teacher->id)
+    //         ->where('status', 'active')
+    //         ->count();
+
+    //     // Get reviews
+    //     $reviews = Review::where('reviewed_id', $teacher->id)->get();
+    //     $rating = round($reviews->avg('rating') ?? 0, 1);
+
+    //     // Get teacher subjects with detailed info
+    //     $teacherSubjects = TeacherSubject::where('teacher_id', $teacher->id)
+    //         ->with([
+    //             'subject' => function($q) {
+    //                 $q->select('id', 'name_en', 'name_ar', 'class_id', 'education_level_id');
+    //             },
+    //             'subject.class' => function($q) {
+    //                 $q->select('id', 'name_en', 'name_ar', 'education_level_id');
+    //             },
+    //             'subject.educationLevel' => function($q) {
+    //                 $q->select('id', 'name_en', 'name_ar');
+    //             }
+    //         ])
+    //         ->get()
+    //         ->map(function($teacherSubject) {
+    //             return [
+    //                 'id' => $teacherSubject->id,
+    //                 'teacher_id' => $teacherSubject->teacher_id,
+    //                 'subject_id' => optional($teacherSubject->subject)->id ?? $teacherSubject->subject_id,
+    //                 'title' => $teacherSubject->subject->name_ar ?? $teacherSubject->subject->name_en,
+    //                 'class_id' => $teacherSubject->subject->class_id,
+    //                 'class_level_id' => $teacherSubject->subject->education_level_id,
+    //                 'class_level_title' => optional($teacherSubject->subject->educationLevel)->name_ar,
+    //                 'class_title' => optional($teacherSubject->subject->class)->name_ar,
+    //                 'category_id' => $teacherSubject->subject->category_id,
+    //                 'hourly_rate' => null,
+    //                 'proficiency' => null,
+    //             ];
+    //         })
+    //         ->values()
+    //         ->toArray();
+    //     // get teacher services
+
+    //     $teacherServices = TeacherServices::where('teacher_id', $teacher->id)
+    //         ->with('service:id,name_en,name_ar,description_en,description_ar')
+    //         ->get()
+    //         ->map(function($teacherService) {
+    //             return [
+    //                 'id' => $teacherService->id,
+    //                 'teacher_id' => $teacherService->teacher_id,
+    //                 'service_id' => optional($teacherService->service)->id ?? $teacherService->service_id,
+    //                 'name' => $teacherService->service->name_ar ?? $teacherService->service->name_en,
+    //                 'description' => $teacherService->service->description_ar ?? $teacherService->service->description_en,
+    //             ];
+    //         })
+    //         ->values()
+    //         ->toArray();
+
+    //     // get teacher languages
+    //     $teacherLanguages = TeacherLanguage::where('teacher_id', $teacher->id)
+    //     ->with('languages.id,name_en,name_ar')
+    //     ->get()
+    //     ->map(function($teacherLanguages)
+    //     {
+    //         return [
+    //             'id' => $teacherLanguages->id,
+    //             'teacher_id' => $teacherLanguages->teacher_id,
+    //             'language_id' => optional($teacherLanguages->languages)->id ?? $teacherLanguages->language_id,
+    //             'name_en' => $teacherLanguages->languages->name_ar,
+    //             'name_ar' => $teacherLanguages->languages->name_en,
+    //         ];
+    //     })->values()
+    //     ->toArray();
+
+    //     // Get availability slots grouped by day
+    //     $availabilitySlots = AvailabilitySlot::where('teacher_id', $teacher->id)
+    //         ->where('is_available', true)
+    //         ->get()
+    //         ->groupBy('day_number');
+
+    //     // Map day numbers to Arabic day names
+    //     $dayNames = [
+    //         0 => 'الاحد',      // Sunday
+    //         1 => 'الاتنين',     // Monday
+    //         2 => 'الثلاثاء',    // Tuesday
+    //         3 => 'الاربعاء',    // Wednesday
+    //         4 => 'الخميس',      // Thursday
+    //         5 => 'الجمعة',      // Friday
+    //         6 => 'السبت',       // Saturday
+    //     ];
+
+    //     $availableTimes = [];
+    //     foreach ($availabilitySlots as $dayNumber => $slots) {
+    //         $dayName = $dayNames[$dayNumber] ?? 'unknown';
+    //         $times = $slots->map(function($slot) {
+    //             return [
+    //                 'id' => $slot->id,
+    //                 'time' => $slot->start_time->format('h:i A') // Format time as "5:00 PM"
+    //             ];
+    //         })->values()->toArray();
+
+    //         $availableTimes[] = [
+    //             'id' => $dayNumber,
+    //             'day' => $dayName,
+    //             'times' => $times
+    //         ];
+    //     }
+
+    //     // Return complete teacher data structure
+    //     return [
+    //         'id' => $teacher->id,
+    //         'first_name' => $teacher->first_name,
+    //         'last_name' => $teacher->last_name,
+    //         'email' => $teacher->email,
+    //         'phone_number' => $teacher->phone_number,
+    //         'email_verified_at' => $teacher->email_verified_at,
+    //         'role_id' => $teacher->role_id,
+    //         'gender' => $teacher->gender,
+    //         'nationality' => $teacher->nationality,
+    //         'verification_code' => $teacher->verification_code,
+    //         'social_provider' => $teacher->social_provider,
+    //         'social_provider_id' => $teacher->social_provider_id,
+    //         'is_active' => (int) $teacher->is_active,
+    //         'profile_image' => $profilePhoto,
+    //         'reviews' => $reviews,
+    //         'rating' => $rating,
+    //         'bio' => optional($teacher->profile)->bio,
+    //         'total_students' => (int) (optional($teacher->teacherInfo)->total_students ?? 0),
+    //         'verified' => (bool) optional($teacher->profile)->verified,
+    //         'service' => $teacherServices,
+    //         'languages' => $teacherLanguages,
+    //         'available_times' => $availableTimes,
+    //         'teach_individual' => (bool) optional($teacher->teacherInfo)->teach_individual,
+    //         'individual_hour_price' => (float) (optional($teacher->teacherInfo)->individual_hour_price ?? 0),
+    //         'teach_group' => (bool) optional($teacher->teacherInfo)->teach_group,
+    //         'group_hour_price' => (float) (optional($teacher->teacherInfo)->group_hour_price ?? 0),
+    //         'max_group_size' => (int) (optional($teacher->teacherInfo)->max_group_size ?? 0),
+    //         'min_group_size' => (int) (optional($teacher->teacherInfo)->min_group_size ?? 0),
+    //         'teacher_subjects' => $teacherSubjects,
+    //     ];
+    // }
     public function getFullTeacherData(User $teacher)
     {
         // Get latest attachments
@@ -575,6 +737,117 @@ class UserController extends Controller
             ->where('attached_to_type', 'profile_picture')
             ->latest()
             ->value('file_path');
+        $resume = $teacher->attachments()
+            ->where('attached_to_type', 'resume')
+            ->latest()
+            ->value('file_path');
+        $certificate = $teacher->attachments()
+            ->where('attached_to_type', 'certificate')
+            ->latest()
+            ->value('file_path');
+
+        // Return the certificate attachment record (if exists) so client can show filename / id
+        $certificateAttachment = $teacher->attachments()
+            ->where('attached_to_type', 'certificate')
+            ->latest()
+            ->first(['id', 'file_name', 'file_path', 'created_at']);
+
+        // Get teacher services (teacher_services pivot) with related service details
+        $rawTS = TeacherServices::where('teacher_id', $teacher->id)
+            ->with('service')
+            ->get();
+
+        // Deduplicate by service_id to avoid duplicate service entries when the pivot was inserted twice
+        $uniqueTS = $rawTS->unique('service_id')->values();
+
+        $teacherServices = $uniqueTS->map(function ($ts) use ($teacher) {
+            $svc = $ts->service;
+            return [
+                'id' => $ts->id,
+                'teacher_id' => $ts->teacher_id,
+                'service_id' => $ts->service_id,
+                'key_name' => $svc->key_name ?? null,
+                'name_en' => $svc->name_en ?? null,
+                'name_ar' => $svc->name_ar ?? null,
+                'description_en' => $svc->description_en ?? null,
+                'description_ar' => $svc->description_ar ?? null,
+                'image' => $svc->image ?? null,
+                'status' => $svc->status ?? null,
+                // There is currently no per-service verification column in teacher_services.
+                // We use the teacher profile verified flag as a fallback. To support per-service
+                // verification, add a `verified` column to `teacher_services` and include it here.
+                'verified' => (bool) optional($teacher->profile)->verified,
+            ];
+        })->values()->toArray();
+
+        // Determine primary service for this teacher (teachers are expected to have at most one)
+        // Use the first unique service if multiple were mistakenly added
+        $primaryTS = $uniqueTS->first();
+
+        $primaryServiceId = 0;
+        $primaryServiceDetails = null;
+        $courses = [];
+        $languages = [];
+        $isPrivateService = false;
+
+        if ($primaryTS && $primaryTS->service) {
+            $svc = $primaryTS->service;
+            $primaryServiceId = (int) $svc->id;
+            $primaryServiceDetails = [
+                'id' => $svc->id,
+                'key_name' => $svc->key_name ?? null,
+                'name_en' => $svc->name_en ?? null,
+                'name_ar' => $svc->name_ar ?? null,
+                'description_en' => $svc->description_en ?? null,
+                'description_ar' => $svc->description_ar ?? null,
+                'image' => $svc->image ?? null,
+                'status' => $svc->status ?? null,
+                // use profile verified as fallback for now
+                'verified' => (bool) optional($teacher->profile)->verified,
+            ];
+
+            // Conditional details depending on service type
+            $key = strtolower($svc->key_name ?? '');
+
+            // Private lessons: include subjects and courses
+            if (str_contains($key, 'private') || $key === 'private_lessons') {
+                $isPrivateService = true;
+                // $teacherSubjects already contains subject details
+                // Fetch courses with basic fields and cover image, but only those matching the primary service
+                if ($primaryServiceId) {
+                    $courses = Course::where('teacher_id', $teacher->id)
+                        ->where('service_id', $primaryServiceId)
+                        ->with(['coverImage'])
+                        ->get()
+                        ->map(function ($c) {
+                            return [
+                                'id' => $c->id,
+                                'name' => $c->name,
+                                'description' => $c->description,
+                                'price' => $c->price,
+                                'duration_hours' => $c->duration_hours,
+                                'status' => $c->status,
+                                'cover_image' => optional($c->coverImage)->file_path ?? null,
+                            ];
+                        })->values()->toArray();
+                }
+            }
+
+            // Language study service: include teacher languages
+            if (str_contains($key, 'lang') || str_contains($key, 'language') || str_contains($key, 'languages')) {
+                $languages = TeacherLanguage::where('teacher_id', $teacher->id)
+                    ->with('language')
+                    ->get()
+                    ->map(function ($tl) {
+                        return [
+                            'id' => $tl->id,
+                            'language_id' => $tl->language_id,
+                            'name_en' => optional($tl->language)->name_en ?? null,
+                            'name_ar' => optional($tl->language)->name_ar ?? null,
+                        ];
+                    })->values()->toArray();
+            }
+        }
 
         // Get earnings data
         $earnings = DB::table('bookings')
@@ -601,18 +874,18 @@ class UserController extends Controller
         // Get teacher subjects with detailed info
         $teacherSubjects = TeacherSubject::where('teacher_id', $teacher->id)
             ->with([
-                'subject' => function($q) {
+                'subject' => function ($q) {
                     $q->select('id', 'name_en', 'name_ar', 'class_id', 'education_level_id');
                 },
-                'subject.class' => function($q) {
+                'subject.class' => function ($q) {
                     $q->select('id', 'name_en', 'name_ar', 'education_level_id');
                 },
-                'subject.educationLevel' => function($q) {
+                'subject.educationLevel' => function ($q) {
                     $q->select('id', 'name_en', 'name_ar');
                 }
             ])
             ->get()
-            ->map(function($teacherSubject) {
+            ->map(function ($teacherSubject) {
                 return [
                     'id' => $teacherSubject->id,
                     'teacher_id' => $teacherSubject->teacher_id,
@@ -622,9 +895,6 @@ class UserController extends Controller
                     'class_level_id' => $teacherSubject->subject->education_level_id,
                     'class_level_title' => optional($teacherSubject->subject->educationLevel)->name_ar,
                     'class_title' => optional($teacherSubject->subject->class)->name_ar,
-                    'category_id' => $teacherSubject->subject->category_id,
-                    'hourly_rate' => null,
-                    'proficiency' => null,
                 ];
             })
             ->values()
@@ -650,7 +920,7 @@ class UserController extends Controller
         $availableTimes = [];
         foreach ($availabilitySlots as $dayNumber => $slots) {
             $dayName = $dayNames[$dayNumber] ?? 'unknown';
-            $times = $slots->map(function($slot) {
+            $times = $slots->map(function ($slot) {
                 return [
                     'id' => $slot->id,
                     'time' => $slot->start_time->format('h:i A') // Format time as "5:00 PM"
@@ -675,25 +945,36 @@ class UserController extends Controller
             'role_id' => $teacher->role_id,
             'gender' => $teacher->gender,
             'nationality' => $teacher->nationality,
+            'verified' => (bool) optional($teacher->profile)->verified,
             'verification_code' => $teacher->verification_code,
             'social_provider' => $teacher->social_provider,
             'social_provider_id' => $teacher->social_provider_id,
-            'is_active' => (int) $teacher->is_active,
-            'profile_image' => $profilePhoto,
-            'reviews' => $reviews,
-            'rating' => $rating,
-            'bio' => optional($teacher->profile)->bio,
-            'total_students' => (int) (optional($teacher->teacherInfo)->total_students ?? 0),
-            'verified' => (bool) optional($teacher->profile)->verified,
-            'service' => optional($teacher->teacherInfo)->service,
-            'available_times' => $availableTimes,
-            'teach_individual' => (bool) optional($teacher->teacherInfo)->teach_individual,
-            'individual_hour_price' => (float) (optional($teacher->teacherInfo)->individual_hour_price ?? 0),
-            'teach_group' => (bool) optional($teacher->teacherInfo)->teach_group,
-            'group_hour_price' => (float) (optional($teacher->teacherInfo)->group_hour_price ?? 0),
-            'max_group_size' => (int) (optional($teacher->teacherInfo)->max_group_size ?? 0),
-            'min_group_size' => (int) (optional($teacher->teacherInfo)->min_group_size ?? 0),
-            'teacher_subjects' => $teacherSubjects,
+            'profile' => [
+                'is_active' => (int) $teacher->is_active,
+                'profile_photo' => $profilePhoto,
+                'resume' => $resume,
+                'certificate' => $certificate,
+                'reviews' => $reviews,
+                'rating' => $rating,
+                'bio' => optional($teacher->profile)->bio,
+                'total_students' => (int) (optional($teacher->teacherInfo)->total_students ?? 0),
+                'verified' => (bool) optional($teacher->profile)->verified,
+                'service' => $primaryServiceId,
+                'services' => $teacherServices,
+                'courses' => $courses,
+                'languages' => $languages,
+                'available_times' => $availableTimes,
+                'certificate_attachment' => $certificateAttachment,
+                'earnings' => $earnings,
+                'currentLessons' => $currentLessons,
+                'teach_individual' => (bool) optional($teacher->teacherInfo)->teach_individual,
+                'individual_hour_price' => (float) (optional($teacher->teacherInfo)->individual_hour_price ?? 0),
+                'teach_group' => (bool) optional($teacher->teacherInfo)->teach_group,
+                'group_hour_price' => (float) (optional($teacher->teacherInfo)->group_hour_price ?? 0),
+                'max_group_size' => (int) (optional($teacher->teacherInfo)->max_group_size ?? 0),
+                'min_group_size' => (int) (optional($teacher->teacherInfo)->min_group_size ?? 0),
+                'teacher_subjects' => $isPrivateService ? $teacherSubjects : [],
+            ]
         ];
     }
 

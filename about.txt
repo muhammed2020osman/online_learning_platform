@@ -462,3 +462,161 @@ app id
 git add app/Services/AgoraService.php app/Agora/RtcTokenBuilder.php ; 
 git commit -m "Fix: use correct RtcTokenBuilder constant RolePublisher" ;
  git push origin main
+
+
+ cd "/Applications/XAMPP/xamppfiles/htdocs/ewan backend/online_learning_platform" && 
+ git fetch origin && git reset --hard origin/main && git clean -fd && 
+ git status --porcelain && 
+ git rev-parse --abbrev-ref HEAD && 
+ git rev-parse --short HEAD
+
+
+ {
+    "success": false,
+    "message": "Cannot add course slot: teacher already has a personal slot on day 1 at 09:00"
+}
+
+
+{
+    "success": true,
+    "data": {
+        "current_page": 1,
+        "data": [
+            {
+                "id": 24,
+                "first_name": "ana",
+                "last_name": "talib",
+                "email": "talib@gmail.com",
+                "phone_number": "+966-+966-+966-+966-+966-966573838872",
+                "gender": "male",
+                "role_id": 4,
+                "is_active": 0,
+                "profile_photo": "http://myewanlaravelapp.loca.lt/storage/profile_photos/dMGIqIUYNQoq2Rr6qYb9njMIXCFCJHUQZ6b5wGWR.jpg",
+                "certificate": null
+            },
+            {
+                "id": 23,
+                "first_name": "Abdelrahman",
+                "last_name": "tooot abodi",
+                "email": "abodyy@gmail.com",
+                "phone_number": "+966-573838811",
+                "gender": "male",
+                "role_id": 3,
+                "is_active": 0,
+                "profile_photo": "http://myewanlaravelapp.loca.lt/storage/profile_photos/GtI825R7YF83ssbmIVdm63KFz1ttxejqvtOMsuBM.jpg",
+                "certificate": null
+            },
+            {
+                "id": 22,
+                "first_name": "abdelrahman",
+                "last_name": "mahdi",
+                "email": "abodyyy@gmail.com",
+                "phone_number": "966579838870",
+                "gender": "male",
+                "role_id": 2,
+                "is_active": 0,
+                "profile_photo": null,
+                "certificate": null
+            },
+            {
+                "id": 20,
+                "first_name": "mohamed",
+                "last_name": "alfatih",
+                "email": "mohamed7alfatih@gmail.com",
+                "phone_number": "966571838872",
+                "gender": "male",
+                "role_id": 4,
+                "is_active": 0,
+                "profile_photo": null,
+                "certificate": null
+            },
+            {
+                "id": 18,
+                "first_name": "John",
+                "last_name": "Doe",
+                "email": "john.doe@example.com",
+                "phone_number": "9665738388720",
+                "gender": "male",
+                "role_id": 4,
+                "is_active": 0,
+                "profile_photo": null,
+                "certificate": null
+            },
+            {
+                "id": 12,
+                "first_name": "meido",
+                "last_name": "momo",
+                "email": "meido@gmail.com",
+                "phone_number": "0567390552",
+                "gender": "male",
+                "role_id": 3,
+                "is_active": 0,
+                "profile_photo": null,
+                "certificate": null
+            },
+            {
+                "id": 5,
+                "first_name": "abooody updated now",
+                "last_name": "tooot abodi",
+                "email": "teacher@example.com",
+                "phone_number": "+966-573838800",
+                "gender": "male",
+                "role_id": 3,
+                "is_active": 0,
+                "profile_photo": "http://myewanlaravelapp.loca.lt/storage/certificates/o19YqQQWmOTPuges04aUHmuftQTIcsX6qhA0RSk9.pdf",
+                "certificate": null
+            },
+            {
+                "id": 4,
+                "first_name": "mohamed",
+                "last_name": "alfatih",
+                "email": "meido3123@gmail.com",
+                "phone_number": "9665738388722",
+                "gender": "male",
+                "role_id": 4,
+                "is_active": 0,
+                "profile_photo": "images/1760617944_logo.png",
+                "certificate": null
+            },
+            {
+                "id": 2,
+                "first_name": "mohamed",
+                "last_name": "alfatih",
+                "email": "ewangeniuses.sa@gmail.com",
+                "phone_number": "+9660573838872",
+                "gender": "male",
+                "role_id": 1,
+                "is_active": 0,
+                "profile_photo": null,
+                "certificate": null
+            }
+        ],
+        "first_page_url": "http://seen-reverse-quarterly-bennett.trycloudflare.com/api/admin/users?page=1",
+        "from": 1,
+        "last_page": 1,
+        "last_page_url": "http://seen-reverse-quarterly-bennett.trycloudflare.com/api/admin/users?page=1",
+        "links": [
+            {
+                "url": null,
+                "label": "pagination.previous",
+                "active": false
+            },
+            {
+                "url": "http://seen-reverse-quarterly-bennett.trycloudflare.com/api/admin/users?page=1",
+                "label": "1",
+                "active": true
+            },
+            {
+                "url": null,
+                "label": "pagination.next",
+                "active": false
+            }
+        ],
+        "next_page_url": null,
+        "path": "http://seen-reverse-quarterly-bennett.trycloudflare.com/api/admin/users",
+        "per_page": 25,
+        "prev_page_url": null,
+        "to": 9,
+        "total": 9
+    }
+}
