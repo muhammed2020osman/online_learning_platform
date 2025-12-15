@@ -620,3 +620,175 @@ git commit -m "Fix: use correct RtcTokenBuilder constant RolePublisher" ;
         "total": 9
     }
 }
+
+
+
+
+AUTHENTICATION & PROFILE — Request / Response examples (for AI Studio)
+
+1) POST /api/auth/verify
+- Purpose: verify registration SMS code
+- Request JSON:
+	{
+		"user_id": 123,
+		"code": "123456"
+	}
+- Success response (200):
+	{
+		"message": "Verification successful.",
+		"token": "<personal-access-token>",
+		"user": { /* user object */ }
+	}
+- Errors:
+	- 422: { "message": "Invalid verification code." }
+
+2) POST /api/auth/resend-code
+- Purpose: resend verification SMS to a user
+- Request JSON:
+	{ "user_id": 123 }
+- Success response (200):
+	{
+		"message": "Verification code resent.",
+		"sms_response": { /* provider debug response */ }
+	}
+
+3) POST /api/auth/verify-reset-code
+- Purpose: verify reset-password code sent to user
+- Request JSON:
+	{ "user_id": 123, "code": "123456" }
+- Success response (200):
+	{
+		"message": "Code verified. You can now reset your password.",
+		"user_id": 123
+	}
+
+4) POST /api/auth/reset-password
+- Purpose: initiate password reset — send verification code to phone
+- Request JSON:
+	{ "phone_number": "+9665XXXXXXXX" }
+- Success response (200):
+	{
+		"message": "Verification code sent. Please check your phone.",
+		"user": { /* user record */ },
+		"sms_response": { /* provider debug response */ }
+	}
+
+5) POST /api/auth/confirm-password
+- Purpose: (middleware-protected) confirm the user's current password before sensitive actions.
+- Note: The project routes call `confirm-password` but AuthController may delegate to a ConfirmablePasswordController; expected request/response:
+- Request JSON:
+	{ "password": "current_password" }
+- Success response (200): { "confirmed": true }
+- Failure (401/422): { "message": "Password confirmation failed." }
+
+6) POST /api/auth/change-password
+- Purpose: change authenticated user's password
+- Request JSON (must use confirmation field `new_password_confirmation`):
+	{
+		"new_password": "newSecret123",
+		"new_password_confirmation": "newSecret123"
+	}
+- Validation: new_password required, min:8, confirmed
+- Success response (200): { "message": "Password updated successfully" }
+
+PROFILE ROUTES (shared, auth:sanctum required)
+
+A) POST /api/profile/teacher/info
+- Purpose: create or update teacher info + classes + subjects
+- Request JSON:
+	{
+		"bio": "Short bio",
+		"teach_individual": true,
+		"individual_hour_price": 80.5,
+		"teach_group": false,
+		"group_hour_price": null,
+		"max_group_size": 5,
+		"min_group_size": 1,
+		"class_ids": [1,2],
+		"subject_ids": [10,11]
+	}
+- Success response (200):
+	{
+		"success": true,
+		"message": "Teacher info, classes, and subjects updated successfully",
+		"data": {
+			"info": { /* TeacherInfo model */ },
+			"classes": [1,2],
+			"subjects": [10,11]
+		}
+	}
+
+B) POST /api/profile/teacher/classes
+- Purpose: sync teacher classes
+- Request JSON: { "class_ids": [1,2,3] }
+- Success response (200): { "success": true, "data": [1,2,3] }
+
+C) POST /api/profile/teacher/subjects
+- Purpose: sync teacher subjects
+- Request JSON: { "subject_ids": [5,6] }
+- Success response (200): { "success": true, "data": [5,6] }
+
+D) PUT /api/profile/profile/update
+- Purpose: update shared profile data; handles both teacher and student updates
+- Common request fields (any subset):
+	{
+		"role_id": 3,                     // optional first-time role set
+		"first_name": "Alaa",
+		"last_name": "K",
+		"email": "user@example.com",
+		"phone_number": "+9665xxxx",
+		"bio": "...",
+		"description": "...",
+		"language_pref": "ar",
+		"terms_accepted": 1,
+		// teacher-specific
+		"teach_individual": true,
+		"individual_hour_price": 60,
+		"class_ids": [1,2],
+		"subject_ids": [10,11]
+	}
+- Success response (200):
+	- If teacher: { "success": true, "message": "Profile updated successfully", "data": { /* full teacher payload */ } }
+	- If student: { "success": true, "message": "Profile updated successfully", "data": { /* basic profile */ } }
+
+E) POST /api/profile/profile
+- Purpose: store initial profile during onboarding
+- Request JSON (required subset):
+	{
+		"role_id": 3,                     // 3=teacher, 4=student
+		"email": "user@example.com",
+		"phone_number": "+9665xxxx",
+		"terms_accepted": 1,
+		"bio": "optional",
+		"language_pref": "ar",
+		// files: profile_photo (image), certificate (pdf), resume (pdf) — multipart/form-data
+	}
+- Success response (200 for teacher or student):
+	{
+		"success": true,
+		"message": "Profile created successfully",
+		"data": { /* teacher full data OR student basic data */ }
+	}
+
+F) GET /api/profile/profile
+- Purpose: return the authenticated user's profile
+- Request: no body — requires auth token
+- Success response (200):
+	{
+		"success": true,
+		"data": {
+			"id": 123,
+			"bio": "...",
+			"profile_photo": { /* attachment */ },
+			"language_pref": "ar",
+			"user": { "id": 123, "name": "Alaa", "email": "..." }
+		}
+	}
+
+Notes & assumptions
+- All profile routes require authentication (sanctum). Include `Authorization: Bearer <token>` header.
+- For endpoints that send SMS the controller returns a provider debug `sms_response` in the body — remove in production if you want cleaner output.
+- `confirm-password` route in `routes/api.php` points to a controller that is not present in the examined AuthController; typical behavior is to POST { password } and receive { confirmed: true } on success.
+
+Usage
+- Paste these request/response examples into AI Studio as training examples / prompt seeds. Adjust field names or types if you customized validations.

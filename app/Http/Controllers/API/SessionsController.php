@@ -12,11 +12,18 @@ use Illuminate\Http\JsonResponse;
 class SessionsController extends Controller
 {
     /**
-     * List sessions for the authenticated user (teacher or student)
-     * Teachers see all sessions they conduct (grouped by time with multiple students)
-     * Students see their individual sessions (which may share time with others)
-     * GET /api/sessions
+     * @OA\Get(
+     *     path="/api/sessions",
+     *     summary="Get all sessions for the authenticated user",
+     *     tags={"Sessions"},
+     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of sessions for the authenticated user"
+     *     )
+     * )
      */
+    
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -68,6 +75,14 @@ class SessionsController extends Controller
      * Get grouped sessions by time (for teacher view)
      * Sessions that share the same time/date are grouped together
      * GET /api/sessions/grouped
+     */
+    /**
+     * @OA\Get(
+     *     path="/api/sessions/grouped",
+     *     summary="Get grouped sessions (teacher view)",
+     *     tags={"Sessions"},
+     *     @OA\Response(response=200, description="Grouped sessions")
+     * )
      */
     public function groupedSessions(Request $request): JsonResponse
     {
@@ -239,6 +254,15 @@ class SessionsController extends Controller
     /**
      * Get details of a specific session
      * GET /api/sessions/{sessionId}
+     */
+    /**
+     * @OA\Get(
+     *     path="/api/sessions/{sessionId}",
+     *     summary="Get session details",
+     *     tags={"Sessions"},
+     *     @OA\Parameter(name="sessionId", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Session details")
+     * )
      */
     public function show(Request $request, $sessionId): JsonResponse
     {

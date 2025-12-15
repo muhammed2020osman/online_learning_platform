@@ -12,6 +12,17 @@ use App\Http\Controllers\API\UserController;
 
 class AuthController extends Controller
 {
+    /**
+     * @OA\Get(
+     *     path="/api/",
+     *     summary="Get all ",
+     *     tags={""},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of "
+     *     )
+     * )
+     */
     // Register
     public function register(Request $request)
     {

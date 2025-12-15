@@ -13,8 +13,27 @@ use Illuminate\Validation\ValidationException;
 class WalletController extends Controller
 {
     /**
+     * @OA\Get(
+     *     path="/api/",
+     *     summary="Get all ",
+     *     tags={""},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of "
+     *     )
+     * )
+     */
+    /**
      * Get teacher's wallet balance and withdrawal history
      * GET /api/teacher/wallet
+     */
+    /**
+     * @OA\Get(
+     *     path="/api/teacher/wallet",
+     *     summary="Get teacher wallet and withdrawals",
+     *     tags={"Wallet"},
+     *     @OA\Response(response=200, description="Wallet data")
+     * )
      */
     public function show(Request $request)
     {
@@ -58,6 +77,16 @@ class WalletController extends Controller
      * - payment_method_id: (integer) ID of user's bank account from userPaymentMethod
      */
     public function withdraw(Request $request)
+
+    /**
+     * @OA\Post(
+     *     path="/api/teacher/wallet/withdraw",
+     *     summary="Request a withdrawal from wallet",
+     *     tags={"Wallet"},
+     *     @OA\RequestBody(@OA\JsonContent(type="object", @OA\Property(property="amount", type="number"), @OA\Property(property="payment_method_id", type="integer"))),
+     *     @OA\Response(response=201, description="Withdrawal request created")
+     * )
+     */
     {
         $teacher = $request->user();
 
@@ -175,6 +204,15 @@ class WalletController extends Controller
      * Get withdrawal request details
      * GET /api/teacher/wallet/withdrawals/{id}
      */
+    /**
+     * @OA\Get(
+     *     path="/api/teacher/wallet/withdrawals/{id}",
+     *     summary="Get withdrawal details",
+     *     tags={"Wallet"},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Withdrawal details")
+     * )
+     */
     public function getWithdrawal(Request $request, $id)
     {
         $teacher = $request->user();
@@ -213,6 +251,15 @@ class WalletController extends Controller
     /**
      * Cancel pending withdrawal request
      * DELETE /api/teacher/wallet/withdrawals/{id}
+     */
+    /**
+     * @OA\Delete(
+     *     path="/api/teacher/wallet/withdrawals/{id}",
+     *     summary="Cancel a pending withdrawal",
+     *     tags={"Wallet"},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Withdrawal cancelled")
+     * )
      */
     public function cancelWithdrawal(Request $request, $id)
     {
@@ -274,6 +321,15 @@ class WalletController extends Controller
     /**
      * Get all withdrawal requests (paginated)
      * GET /api/teacher/wallet/withdrawals
+     */
+    /**
+     * @OA\Get(
+     *     path="/api/teacher/wallet/withdrawals",
+     *     summary="List withdrawal requests",
+     *     tags={"Wallet"},
+     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
+     *     @OA\Response(response=200, description="List of withdrawals")
+     * )
      */
     public function listWithdrawals(Request $request)
     {

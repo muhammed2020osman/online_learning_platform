@@ -1,0 +1,469 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Online Learning Platform API",
+        "description": "API documentation for the Online Learning Platform",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/": {
+            "get": {
+                "tags": [
+                    ""
+                ],
+                "summary": "Get all ",
+                "operationId": "b83f730a578a219351fb2cead0f86def",
+                "responses": {
+                    "200": {
+                        "description": "List of "
+                    }
+                }
+            }
+        },
+        "/api/student/booking": {
+            "get": {
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Get bookings for authenticated student",
+                "operationId": "e8cbc290436cd4f563bb8c630e5abe50",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of bookings"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Create a new booking",
+                "operationId": "470d796272ea732e099bf85400e471d1",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "course_id": {
+                                        "type": "integer"
+                                    },
+                                    "service_id": {
+                                        "type": "integer"
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "example": "single"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Booking created successfully"
+                    }
+                }
+            }
+        },
+        "/api/student/booking/payment-callback": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Payment callback endpoint for 3DS/OTP verification",
+                "operationId": "243eac0c8f7035814d0c87dfda85ff04",
+                "parameters": [
+                    {
+                        "name": "resourcePath",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "checkoutId",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Payment verified or failed"
+                    }
+                }
+            }
+        },
+        "/api/student/booking/{bookingId}/pay-3ds": {
+            "post": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Initiate 3DS payment for a booking",
+                "operationId": "3750b39f25866474d1a376dc9449ff7b",
+                "parameters": [
+                    {
+                        "name": "bookingId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "3DS checkout created"
+                    }
+                }
+            }
+        },
+        "/api/student/booking/pay": {
+            "post": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Pay for a booking (card)",
+                "operationId": "ca7866ad9ded3113bd76e1eee505786b",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Payment processed or OTP required"
+                    }
+                }
+            }
+        },
+        "/api/student/booking/{bookingId}": {
+            "get": {
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Get booking details",
+                "operationId": "7aec6c83682ef169bf0cd97f42502e4e",
+                "parameters": [
+                    {
+                        "name": "bookingId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Booking details"
+                    }
+                }
+            }
+        },
+        "/api/student/booking/{bookingId}/cancel": {
+            "put": {
+                "tags": [
+                    "Booking"
+                ],
+                "summary": "Cancel a booking",
+                "operationId": "854b36c8319caf62e09a8d48486ad5b4",
+                "parameters": [
+                    {
+                        "name": "bookingId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Booking cancelled"
+                    }
+                }
+            }
+        },
+        "/api/courses": {
+            "get": {
+                "tags": [
+                    "Courses"
+                ],
+                "summary": "Browse published courses",
+                "operationId": "c37c515ae1ea3ad48219b8179246858e",
+                "responses": {
+                    "200": {
+                        "description": "List of courses"
+                    }
+                }
+            }
+        },
+        "/api/courses/{id}": {
+            "get": {
+                "tags": [
+                    "Courses"
+                ],
+                "summary": "Get course details",
+                "operationId": "bc57e32b05958570eae4745a05618e50",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Course details"
+                    }
+                }
+            }
+        },
+        "/api/payments/direct": {
+            "post": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Create a direct payment via HyperPay",
+                "operationId": "343ed295ea639d81da58f3b3cd5740a9",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "HyperPay response"
+                    }
+                }
+            }
+        },
+        "/api/payments/result": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Check payment result after 3DS redirect",
+                "operationId": "748028b6f900a35f9e5f6ce830fb8a4c",
+                "parameters": [
+                    {
+                        "name": "resourcePath",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to success or failed page"
+                    }
+                }
+            }
+        },
+        "/api/sessions": {
+            "get": {
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "Get all sessions for the authenticated user",
+                "operationId": "0b722a0b8a07394301d29492524e35c3",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of sessions for the authenticated user"
+                    }
+                }
+            }
+        },
+        "/api/sessions/grouped": {
+            "get": {
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "Get grouped sessions (teacher view)",
+                "operationId": "60efb41fc0272af621b2460b36def8a9",
+                "responses": {
+                    "200": {
+                        "description": "Grouped sessions"
+                    }
+                }
+            }
+        },
+        "/api/sessions/{sessionId}": {
+            "get": {
+                "tags": [
+                    "Sessions"
+                ],
+                "summary": "Get session details",
+                "operationId": "c52f6cbf354c88760b813c01770a7aef",
+                "parameters": [
+                    {
+                        "name": "sessionId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Session details"
+                    }
+                }
+            }
+        },
+        "/api/teacher/wallet": {
+            "get": {
+                "tags": [
+                    "Wallet"
+                ],
+                "summary": "Get teacher wallet and withdrawals",
+                "operationId": "39cce2a648930dec69f25673903ee35a",
+                "responses": {
+                    "200": {
+                        "description": "Wallet data"
+                    }
+                }
+            }
+        },
+        "/api/teacher/wallet/withdrawals/{id}": {
+            "get": {
+                "tags": [
+                    "Wallet"
+                ],
+                "summary": "Get withdrawal details",
+                "operationId": "cc14c9c51abbb5e7cd8cf2b751fe952c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Withdrawal details"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Wallet"
+                ],
+                "summary": "Cancel a pending withdrawal",
+                "operationId": "1988527c662ca305228d8b8934540fce",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Withdrawal cancelled"
+                    }
+                }
+            }
+        },
+        "/api/teacher/wallet/withdrawals": {
+            "get": {
+                "tags": [
+                    "Wallet"
+                ],
+                "summary": "List withdrawal requests",
+                "operationId": "3d4614dc101c7c26090f8b8a38f6e4b7",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of withdrawals"
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "",
+            "description": ""
+        },
+        {
+            "name": "Booking",
+            "description": "Booking"
+        },
+        {
+            "name": "Payment",
+            "description": "Payment"
+        },
+        {
+            "name": "Courses",
+            "description": "Courses"
+        },
+        {
+            "name": "Sessions",
+            "description": "Sessions"
+        },
+        {
+            "name": "Wallet",
+            "description": "Wallet"
+        }
+    ]
+}

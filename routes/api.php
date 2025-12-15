@@ -187,8 +187,8 @@ Route::prefix('student')->middleware(['auth:sanctum', 'role:student'])->group(fu
     // sessions
     Route::get('/sessions', [SessionsController::class, 'index']); // list my sessions
     Route::get('/sessions/grouped', [SessionsController::class, 'groupedSessions']); // teacher: grouped sessions by time
-    Route::get('/sessions/{sessionId}', [SessionsController::class, 'show']); // session details
-    Route::post('/sessions/{sessionId}/join', [SessionsController::class, 'join']); // join session
+    Route::get('/sessions/{id}', [SessionsController::class, 'show']); // session details
+    Route::post('/sessions/{id}/join', [SessionsController::class, 'join']); // join session
     // add payment method
     Route::get('payment-methods', [UserPaymentMethodController::class, 'index']);
     Route::post('payment-methods', [UserPaymentMethodController::class, 'store']);
@@ -270,7 +270,6 @@ Route::prefix('teacher')->middleware(['auth:sanctum', 'role:teacher'])->group(fu
     // payments methods
     Route::get('payment-methods', [UserPaymentMethodController::class, 'index']);
     Route::post('payment-methods', [UserPaymentMethodController::class, 'store']);
-    Route::put('payment-methods/{id}', [UserPaymentMethodController::class, 'update']);
     Route::put('payment-methods/set-default/{id}', [UserPaymentMethodController::class, 'setDefault']);
     Route::delete('payment-methods/{id}', [UserPaymentMethodController::class, 'destroy']);
     // reviews
@@ -363,11 +362,6 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(functi
     Route::post('/payouts', [PayoutAdminController::class, 'store']);
     Route::post('/payouts/{id}/mark-sent', [PayoutAdminController::class, 'markSent']);
 
-    // Services management
-    Route::get('/services', [ServiceController::class, 'index']);
-    Route::post('/services', [ServiceController::class, 'store']);
-    Route::put('/services/{id}', [ServiceController::class, 'update']);
-    Route::delete('/services/{id}', [ServiceController::class, 'destroy']);
 
     // Gallery / media control
     Route::get('/gallery', [GalleryController::class, 'index']);

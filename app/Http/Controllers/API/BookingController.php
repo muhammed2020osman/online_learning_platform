@@ -1,5 +1,18 @@
 <?php
 
+/**
+ * @OA\Info(
+ *   version="1.0.0",
+ *   title="Ewan Online Learning Platform API",
+ *   description="API documentation generated from controller annotations"
+ * )
+ *
+ * @OA\Server(
+ *     url="/api",
+ *     description="API server"
+ * )
+ */
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
@@ -20,7 +33,34 @@ use Carbon\Carbon;
 class BookingController extends Controller
 {
     /**
+     * @OA\Get(
+     *     path="/api/",
+     *     summary="Get all ",
+     *     tags={""},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of "
+     *     )
+     * )
+     */
+    /**
      * Create a new booking
+     */
+    /**
+     * @OA\Post(
+     *     path="/api/student/booking",
+     *     summary="Create a new booking",
+     *     tags={"Booking"},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(type="object",
+     *             @OA\Property(property="course_id", type="integer"),
+     *             @OA\Property(property="service_id", type="integer"),
+     *             @OA\Property(property="type", type="string", example="single")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Booking created successfully")
+     * )
      */
     public function createBooking(Request $request): JsonResponse
     {
@@ -315,6 +355,16 @@ class BookingController extends Controller
      * 
      * HyperPay redirects here after user completes OTP
      */
+    /**
+     * @OA\Get(
+     *     path="/api/student/booking/payment-callback",
+     *     summary="Payment callback endpoint for 3DS/OTP verification",
+     *     tags={"Payment"},
+     *     @OA\Parameter(name="resourcePath", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="checkoutId", in="query", @OA\Schema(type="string")),
+     *     @OA\Response(response=200, description="Payment verified or failed")
+     * )
+     */
     public function paymentCallback(Request $request): JsonResponse
     {
         $resourcePath = $request->get('resourcePath');
@@ -462,6 +512,16 @@ class BookingController extends Controller
     /**
      * Pay for a pending booking using 3DS checkout
      * POST /api/student/booking/{bookingId}/pay-3ds
+     */
+    /**
+     * @OA\Post(
+     *     path="/api/student/booking/{bookingId}/pay-3ds",
+     *     summary="Initiate 3DS payment for a booking",
+     *     tags={"Payment"},
+     *     @OA\Parameter(name="bookingId", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\RequestBody(@OA\JsonContent(type="object")),
+     *     @OA\Response(response=200, description="3DS checkout created")
+     * )
      */
     public function payBooking3DS(Request $request): JsonResponse
     {
@@ -631,6 +691,15 @@ class BookingController extends Controller
      * 
      * Request: card details + booking info
      * Response: redirect URL for OTP/3DS or success if already verified
+     */
+    /**
+     * @OA\Post(
+     *     path="/api/student/booking/pay",
+     *     summary="Pay for a booking (card)",
+     *     tags={"Payment"},
+     *     @OA\RequestBody(@OA\JsonContent(type="object")),
+     *     @OA\Response(response=200, description="Payment processed or OTP required")
+     * )
      */
     public function payBooking(Request $request): JsonResponse
     {
@@ -883,14 +952,63 @@ class BookingController extends Controller
         $sessions = $booking->sessions;
         
         foreach ($sessions as $session) {
-            // Example: dispatch job to generate Zoom meeting link
-            // Job might be: GenerateZoomMeetingJob::dispatch($session);
-            Log::info('Session meeting generation queued', ['session_id' => $session->id]);
+            Log::info('Session meeting generation processing', ['session_id' => $session->id]);
+
+            try {
+                // If session already has a meeting/join URL, skip creation
+                if (empty($session->meeting_id) || empty($session->join_url)) {
+                    $created = $session->createMeeting();
+                    Log::info('Session createMeeting() result', ['session_id' => $session->id, 'created' => $created]);
+                } else {
+                    Log::info('Session already has meeting info', ['session_id' => $session->id]);
+                }
+
+                // Notify participants if join_url is present
+                if (! empty($session->join_url)) {
+                    $ns = new \App\Services\NotificationService();
+
+                    $titleStudent = app()->getLocale() == 'ar' ? 'رابط الحصة جاهز' : 'Lesson Link Ready';
+                    $msgStudent = app()->getLocale() == 'ar'
+                        ? "رابط الجلسة جاهز للحصة ({$session->booking->booking_reference}). يمكنك الانضمام عبر: {$session->join_url}"
+                        : "Your session link is ready for booking ({$session->booking->booking_reference}). Join here: {$session->join_url}";
+
+                    $ns->send($session->student, 'session_link_ready', $titleStudent, $msgStudent, [
+                        'session_id' => $session->id,
+                        'join_url' => $session->join_url,
+                        'session_date' => $session->session_date,
+                        'session_time' => $session->start_time,
+                    ]);
+
+                    $titleTeacher = app()->getLocale() == 'ar' ? 'رابط الحصة جاهز' : 'Lesson Link Ready';
+                    $msgTeacher = app()->getLocale() == 'ar'
+                        ? "رابط الجلسة جاهز للحصة ({$session->booking->booking_reference}). ابدأ الجلسة عبر: {$session->host_url}"
+                        : "Your session link is ready for booking ({$session->booking->booking_reference}). Start session here: {$session->host_url}";
+
+                    $ns->send($session->teacher, 'session_link_ready', $titleTeacher, $msgTeacher, [
+                        'session_id' => $session->id,
+                        'start_url' => $session->host_url,
+                        'session_date' => $session->session_date,
+                        'session_time' => $session->start_time,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Failed to create session meeting', ['session_id' => $session->id, 'error' => $e->getMessage()]);
+                // continue with other sessions
+            }
         }
     }
 
     /**
      * Get student's bookings
+     */
+    /**
+     * @OA\Get(
+     *     path="/api/student/booking",
+     *     summary="Get bookings for authenticated student",
+     *     tags={"Booking"},
+     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
+     *     @OA\Response(response=200, description="List of bookings")
+     * )
      */
     public function getStudentBookings(Request $request): JsonResponse
     {
@@ -981,6 +1099,15 @@ class BookingController extends Controller
 
     /**
      * Get detailed booking information
+     */
+    /**
+     * @OA\Get(
+     *     path="/api/student/booking/{bookingId}",
+     *     summary="Get booking details",
+     *     tags={"Booking"},
+     *     @OA\Parameter(name="bookingId", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Booking details")
+     * )
      */
     public function getBookingDetails($bookingId): JsonResponse
     {
@@ -1110,6 +1237,15 @@ class BookingController extends Controller
 
     /**
      * Cancel a booking
+     */
+    /**
+     * @OA\Put(
+     *     path="/api/student/booking/{bookingId}/cancel",
+     *     summary="Cancel a booking",
+     *     tags={"Booking"},
+     *     @OA\Parameter(name="bookingId", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Booking cancelled")
+     * )
      */
     public function cancelBooking($bookingId): JsonResponse
     {

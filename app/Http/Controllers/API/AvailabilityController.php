@@ -12,6 +12,17 @@ use App\Models\Sessions;
 class AvailabilityController extends Controller
 {
     /**
+     * @OA\Get(
+     *     path="/api/teachers",
+     *     summary="Get all teachers",
+     *     tags={"Teachers"},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of teachers"
+     *     )
+     * )
+     */
+    /**
      * Display a listing of the resource.
      * Groups availability slots by day_number with time_slots array.
      * Includes session data if slot is booked.

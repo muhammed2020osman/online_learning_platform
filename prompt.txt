@@ -1,0 +1,167 @@
+TEACHER API — Request / Response examples (for AI Studio)
+
+Overview
+- Base path: /api/teacher
+- Auth: All teacher endpoints require Authorization: Bearer <token> (Laravel Sanctum)
+- Content types: application/json for JSON bodies; multipart/form-data for file uploads
+
+1) GET /api/teacher/education-levels
+- Purpose: fetch education levels with classes & subjects for teacher view
+- Request: headers only (Authorization)
+- Response (200):
+	{
+		"success": true,
+		"data": [
+			{
+				"id": 1,
+				"name_en": "Primary",
+				"classes": [ {"id": 5, "name_en": "Grade 1"}, ... ]
+			}
+		]
+	}
+
+2) POST /api/teacher/info
+- Purpose: create/update teacher profile, pricing and related relations
+- Request JSON:
+	{
+		"bio": "I teach Math",
+		"teach_individual": true,
+		"individual_hour_price": 80.5,
+		"teach_group": false,
+		"group_hour_price": null,
+		"max_group_size": 5,
+		"min_group_size": 1,
+		"class_ids": [1,2],
+		"subject_ids": [10,11]
+	}
+- Validation highlights: class_ids & subject_ids required (controller requires them) and must exist in DB
+- Response (200):
+	{
+		"success": true,
+		"message": "Teacher info, classes, and subjects updated successfully",
+		"data": {
+			"info": { /* TeacherInfo model */ },
+			"classes": [1,2],
+			"subjects": [10,11]
+		}
+	}
+
+3) POST /api/teacher/classes
+- Purpose: add teacher classes
+- Request JSON (example): { "class_id": [1,2] }
+- Response (200): { "message": "success" }
+
+4) POST /api/teacher/subjects
+- Purpose: add teacher subjects
+- Request JSON: { "subjects_id": [5,6] }
+- Response (200): { "message": "success" }
+
+5) PUT /api/teacher/classes/{id}
+- Purpose: update a teacher class record
+- Request JSON: { "class_id": 3 }
+- Response (200): { "data": { /* updated TeacherTeachClasses */ }, "message": "Class updated" }
+
+6) PUT /api/teacher/subjects/{id}
+- Purpose: update a teacher subject record
+- Request JSON: { "subject_id": 15 }
+- Response (200): { "data": { /* updated TeacherSubject */ }, "message": "Subject updated" }
+
+7) DELETE /api/teacher/classes/{id}
+- Purpose: remove teacher class
+- Response (200): { "message": "Class deleted" }
+
+8) DELETE /api/teacher/subjects/{id}
+- Purpose: remove teacher subject
+- Response (200): { "message": "Subject deleted" }
+
+9) Availability slots
+- GET /api/teacher/availability
+	- Response (200):
+		{
+			"success": true,
+			"data": [
+				{ "day":1, "time_slots": [ {"id":12, "time":"09:00","session":null}, ... ] },
+				...
+			]
+		}
+
+- POST /api/teacher/availability
+	- Request JSON (bulk):
+		{
+			"available_times": [
+				{ "day": 1, "times": ["09:00 AM","14:00"] },
+				{ "day": 2, "times": ["10:00"] }
+			],
+			"course_id": null,
+			"order_id": null,
+			"repeat_type": "none"
+		}
+	- Response (200): { "success": true, "message": "success", "data": [ /* created slots */ ] }
+
+- GET /api/teacher/availability/{id}
+	- Response (200): { "success": true, "data": { /* slot object */ } }
+
+- PUT /api/teacher/availability/{id}
+	- Request JSON: either bulk `available_times` for sync or single fields `day_number`, `start_time`, `is_available` for update
+	- Response (200): { "success": true, "message": "Slot updated successfully", "data": { /* updated slot */ } }
+
+- DELETE /api/teacher/availability/{id}
+	- Response (200): { "success": true, "message": "Slot deleted successfully" }
+
+10) Courses (teacher)
+- POST /api/teacher/courses
+	- Request (multipart/form-data when uploading cover_image):
+		{
+			"category_id": 2,
+			"name": "Algebra Basics",
+			"description": "...",
+			"course_type": "single",
+			"price": 120.50,
+			"duration_hours": 1,
+			"status": "published",
+			"available_slots": [ { "day":1, "times": ["09:00"] }, ... ]
+		}
+	- Response (201): { "success": true, "message": "Course created successfully", "data": { /* course + availabilitySlots */ } }
+
+- PUT /api/teacher/courses/{id}
+	- Request JSON: subset of fields from create; can include `cover_image_id` or file
+	- Response (200): { "success": true, "message": "Course updated successfully", "data": { /* course */ } }
+
+- DELETE /api/teacher/courses/{id}
+	- Response (200): { "success": true, "message": "Course deleted successfully" }
+
+- GET /api/teacher/courses (myCourses)
+	- Response (200): { "success": true, "data": [ /* teacher's courses */ ] }
+
+11) Lessons (teacher)
+- POST /api/teacher/courses/{course_id}/lessons
+	- Request JSON: { "title": "Lesson 1", "content": "...", "duration_minutes": 60 }
+	- Response (201): { "success": true, "data": { /* created lesson */ } }
+
+- PUT /api/teacher/lessons/{id}
+	- Request JSON: fields to update
+	- Response (200): { "success": true, "data": { /* updated lesson */ } }
+
+- DELETE /api/teacher/lessons/{id}
+	- Response (200): { "success": true, "message": "Lesson deleted" }
+
+12) Sessions control (teacher)
+- POST /api/teacher/sessions/{id}/start
+	- Purpose: mark session started and return host/join info
+	- Request: no body (auth)
+	- Response (200): { "success": true, "message": "Session started", "data": { "session_id":123, "started_at": "2025-12-15T10:00:00Z", "host_url": "https://...", "join_url": "https://..." } }
+
+- POST /api/teacher/sessions/{id}/end
+	- Purpose: mark session ended
+	- Response (200): { "success": true, "message": "Session ended", "data": { "session_id":123, "ended_at": "2025-12-15T11:00:00Z" } }
+
+13) Wallet (teacher): endpoints already documented earlier — `GET /api/teacher/wallet`, `POST /api/teacher/wallet/withdraw`, `GET /api/teacher/wallet/withdrawals`, etc.
+
+Notes & assumptions
+- Controllers return `success` and `message` fields in many endpoints — follow that convention in examples.
+- Time parsing is flexible; accepted formats include "g:i A", "H:i". When sending times, prefer ISO-like strings for clarity.
+- For file uploads use multipart/form-data and attach files with the indicated keys (`profile_photo`, `certificate`, `resume`, `cover_image`).
+
+Usage
+- Copy these examples into AI Studio as request/response training pairs. Adjust field names if your DB or validators differ.
+

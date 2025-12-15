@@ -23,6 +23,18 @@ class PaymentController extends Controller
      * POST /api/payments/direct
      * Receive card info & create payment through HyperPay
      */
+    /**
+     * @OA\Post(
+     *     path="/api/payments/direct",
+     *     summary="Create a direct payment via HyperPay",
+     *     tags={"Payment"},
+     *     @OA\RequestBody(@OA\JsonContent(type="object")),
+     *     @OA\Response(response=200, description="HyperPay response")
+     * )
+     *
+     * POST /api/payments/direct
+     * Receive card info & create payment through HyperPay
+     */
     public function directPayment(Request $request)
     {
         $request->validate([
@@ -102,7 +114,15 @@ class PaymentController extends Controller
      * GET /api/payments/result
      * Check payment status by resourcePath (after 3D secure redirect)
      */
-   
+    /**
+     * @OA\Get(
+     *     path="/api/payments/result",
+     *     summary="Check payment result after 3DS redirect",
+     *     tags={"Payment"},
+     *     @OA\Parameter(name="resourcePath", in="query", @OA\Schema(type="string")),
+     *     @OA\Response(response=302, description="Redirect to success or failed page")
+     * )
+     */
     public function paymentResult(Request $request)
     {
         $resourcePath = $request->get('resourcePath');

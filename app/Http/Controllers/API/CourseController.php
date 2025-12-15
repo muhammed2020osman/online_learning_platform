@@ -13,7 +13,26 @@ use App\Models\Services;
 
 class CourseController extends Controller
 {
+    /**
+     * @OA\Get(
+     *     path="/api/",
+     *     summary="Get all ",
+     *     tags={""},
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of "
+     *     )
+     * )
+     */
     // Student: Browse all published courses
+    /**
+     * @OA\Get(
+     *     path="/api/courses",
+     *     summary="Browse published courses",
+     *     tags={"Courses"},
+     *     @OA\Response(response=200, description="List of courses")
+     * )
+     */
     public function index(Request $request): JsonResponse
     {
         $service_id = 4;
@@ -56,6 +75,15 @@ class CourseController extends Controller
     
 
     // Student: Get course details
+    /**
+     * @OA\Get(
+     *     path="/api/courses/{id}",
+     *     summary="Get course details",
+     *     tags={"Courses"},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Course details")
+     * )
+     */
     public function show(Request $request, int $id): JsonResponse
     {
         $course = Course::with(['teacher', 'category','availabilitySlots', 'coverImage', 'courselessons'])
