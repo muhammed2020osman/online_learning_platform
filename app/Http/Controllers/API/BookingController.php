@@ -99,7 +99,7 @@ class BookingController extends Controller
                 $slotId = $request->availability_slot_id;
                 // lock the slot row to avoid race conditions
                 $slot = AvailabilitySlot::where('id', $slotId)->lockForUpdate()->firstOrFail();
-               
+
 
                 // Validate slot ownership and state with detailed reasons
                 $reasons = [];
@@ -162,7 +162,7 @@ class BookingController extends Controller
             // Slots may be recurring (use day_number) or have a specific date.
             // Note: Empty string is falsy, so check it explicitly
             $slotDate = null;
-            
+
 
             if ($slot->date && trim((string)$slot->date) !== '') {
                 $slotDate = $slot->date instanceof \Carbon\Carbon ? $slot->date->format('Y-m-d') : (string) $slot->date;
@@ -177,8 +177,8 @@ class BookingController extends Controller
                                // If the slot time is earlier or equal to now for the same day, schedule next week
                 $slotStart = $this->extractTimeOnly($slot->start_time);
                 $candidateDateTime = Carbon::parse($candidate->format('Y-m-d') . ' ' . $slotStart);
-                
-                
+
+
 
                 if ($candidateDateTime->lessThanOrEqualTo(now())) {
                     $candidate->addDays(7);
@@ -197,7 +197,7 @@ class BookingController extends Controller
 
             $startTime = $this->extractTimeOnly($slot->start_time);
             $endTime = $this->extractTimeOnly($slot->end_time);
-          
+
             try {
                 $slotDateTime = Carbon::parse($date . ' ' . $startTime);
                 $slotEndDateTime = Carbon::parse($date . ' ' . $endTime);
@@ -249,7 +249,7 @@ class BookingController extends Controller
             // Mark slot as booked
             $slot->update(['is_available' => false, 'is_booked' => true, 'booking_id' => $booking->id]);
             // Create sessions skeleton
-            
+
             try {
                 Sessions::createForBooking($booking);
                 Log::info('Sessions created successfully', ['booking_id' => $booking->id]);
@@ -352,7 +352,7 @@ class BookingController extends Controller
     /**
      * Payment callback - verify payment after OTP/3DS redirect
      * GET /api/student/booking/payment-callback?resourcePath=xxx
-     * 
+     *
      * HyperPay redirects here after user completes OTP
      */
     /**
@@ -381,7 +381,7 @@ class BookingController extends Controller
         try {
             // Get payment status from HyperPay
             $hyperpayService = app(\App\Services\HyperpayService::class);
-            
+
             if ($checkoutId) {
                 $statusResponse = $hyperpayService->getPaymentStatus($checkoutId);
             } else {
@@ -404,7 +404,7 @@ class BookingController extends Controller
 
             // Extract merchant transaction ID to find payment
             $merchantTransactionId = $statusData['merchantTransactionId'] ?? null;
-            
+
             if (!$merchantTransactionId) {
                 return response()->json([
                     'success' => false,
@@ -526,7 +526,7 @@ class BookingController extends Controller
     public function payBooking3DS(Request $request): JsonResponse
     {
         $studentId = auth()->id();
-        
+
         $request->validate([
             'booking_id' => 'required|exists:bookings,id',
             'payment_brand' => 'required|in:VISA,MASTER,MADA',
@@ -580,7 +580,7 @@ class BookingController extends Controller
 
             // Prepare 3DS checkout payload
             $hyperpayService = app(\App\Services\HyperpayService::class);
-            
+
             $callbackUrl = $request->return_url ?? route('api.payment.callback');
 
             $payload = [
@@ -688,7 +688,7 @@ class BookingController extends Controller
     /**
      * Pay for a pending booking using card (Direct Payment with OTP redirect)
      * POST /api/student/booking/{bookingId}/pay
-     * 
+     *
      * Request: card details + booking info
      * Response: redirect URL for OTP/3DS or success if already verified
      */
@@ -704,7 +704,7 @@ class BookingController extends Controller
     public function payBooking(Request $request): JsonResponse
     {
         $studentId = auth()->id();
-        
+
         // Validate card payment details
         $currentYear = Carbon::now()->year;
         $request->validate([
@@ -716,7 +716,7 @@ class BookingController extends Controller
             'cvv' => 'required|regex:/^\d{3,4}$/',
             'payment_brand' => 'required|in:VISA,MASTER,MADA',
         ]);
-        
+
         $bookingId = $request->booking_id;
         DB::beginTransaction();
         try {
@@ -765,7 +765,7 @@ class BookingController extends Controller
 
             // Prepare HyperPay payload with card details
             $hyperpayService = app(\App\Services\HyperpayService::class);
-            
+
             $payload = [
                 'amount' => number_format($booking->total_amount, 2, '.', ''),
                 'currency' => strtoupper($booking->currency),
@@ -818,20 +818,21 @@ class BookingController extends Controller
 
             // **DEBUG: Return raw HyperPay response for testing**
             // Remove this after testing - it shows the actual HyperPay response
-            return response()->json([
-                'success' => false,
-                'message' => 'DEBUG: Raw HyperPay Response (remove after testing)',
-                'hyperpay_response' => $responseData,
-                'status_code' => $hyperpayResponse->status(),
-                'result_code' => $resultCode,
-                'result_description' => $resultDescription,
-            ], 200);
+            // ab sop 
+            // return response()->json([
+            //     'success' => false,
+            //     'message' => 'DEBUG: Raw HyperPay Response (remove after testing)',
+            //     'hyperpay_response' => $responseData,
+            //     'status_code' => $hyperpayResponse->status(),
+            //     'result_code' => $resultCode,
+            //     'result_description' => $resultDescription,
+            // ], 200);
 
             // Success codes start with 000
             if (str_starts_with($resultCode, '000.')) {
                 // Check if there's a redirect URL for OTP/3DS
-                $redirectUrl = $responseData['redirect']['url'] ?? 
-                              $responseData['redirectUrl'] ?? 
+                $redirectUrl = $responseData['redirect']['url'] ??
+                              $responseData['redirectUrl'] ??
                               null;
 
                 if ($redirectUrl) {
@@ -950,7 +951,7 @@ class BookingController extends Controller
     {
         // If using Zoom or Agora, schedule meeting generation for each session
         $sessions = $booking->sessions;
-        
+
         foreach ($sessions as $session) {
             Log::info('Session meeting generation processing', ['session_id' => $session->id]);
 
@@ -1112,7 +1113,7 @@ class BookingController extends Controller
     public function getBookingDetails($bookingId): JsonResponse
     {
         $studentId = auth()->id();
-        
+
         $booking = Booking::with([
             'course.subject',
             'course.service',
@@ -1162,7 +1163,7 @@ class BookingController extends Controller
             'reference' => $booking->booking_reference,
             'status' => $booking->status,
             'booking_date' => $booking->booking_date->format('Y-m-d H:i'),
-            
+
             'teacher' => [
                 'id' => $booking->teacher->id,
                 'name' => $booking->teacher->first_name.' '.$booking->teacher->last_name,
@@ -1172,9 +1173,9 @@ class BookingController extends Controller
                 'phone' => $booking->status === 'confirmed' ? $booking->teacher->phone : null,
                 'email' => $booking->status === 'confirmed' ? $booking->teacher->email : null,
             ],
-            
+
             'course' => $courseData,
-            
+
             'session_info' => [
                 'type' => $booking->session_type,
                 'total_sessions' => $booking->sessions_count,
@@ -1185,7 +1186,7 @@ class BookingController extends Controller
                 'first_session_start_time' => $booking->first_session_start_time,
                 'first_session_end_time' => $booking->first_session_end_time,
             ],
-            
+
             'pricing' => [
                 'price_per_session' => $booking->price_per_session,
                 'subtotal' => $booking->subtotal,
@@ -1194,7 +1195,7 @@ class BookingController extends Controller
                 'total_amount' => $booking->total_amount,
                 'currency' => $booking->currency,
             ],
-            
+
             'payment' => $booking->payment ? [
                 'id' => $booking->payment->id,
                 'status' => $booking->payment->status,
@@ -1202,7 +1203,7 @@ class BookingController extends Controller
                 'transaction_reference' => $booking->payment->transaction_reference,
                 'paid_at' => $booking->payment->paid_at?->format('Y-m-d H:i'),
             ] : null,
-            
+
             'sessions' => $booking->sessions->map(function ($session) {
                 return [
                     'id' => $session->id,
@@ -1216,11 +1217,11 @@ class BookingController extends Controller
                     'homework' => $session->homework,
                 ];
             }),
-            
+
             'special_requests' => $booking->special_requests,
             'cancellation_reason' => $booking->cancellation_reason,
             'cancelled_at' => $booking->cancelled_at?->format('Y-m-d H:i'),
-            
+
             'actions' => [
                 'can_cancel' => $this->canCancelBooking($booking),
                 'can_reschedule' => $this->canRescheduleBooking($booking),
@@ -1250,7 +1251,7 @@ class BookingController extends Controller
     public function cancelBooking($bookingId): JsonResponse
     {
         $studentId = auth()->id();
-        
+
         $booking = Booking::where('student_id', $studentId)
                          ->findOrFail($bookingId);
 
@@ -1265,7 +1266,7 @@ class BookingController extends Controller
         try {
             // Calculate refund amount based on cancellation policy
             $refundInfo = $this->calculateRefund($booking);
-            
+
             // Update booking status
             $booking->update([
                 'status' => 'cancelled',
@@ -1339,7 +1340,7 @@ class BookingController extends Controller
     {
         // Integrate with your payment gateway (e.g., Stripe, PayPal, local Saudi gateways)
         // This is a placeholder - implement actual payment processing
-        
+
         switch ($paymentMethod) {
             case 'card':
                 return 'https://payment-gateway.com/pay/' . $payment->transaction_reference;
@@ -1472,7 +1473,7 @@ class BookingController extends Controller
     {
         // Implement refund processing logic
         // This would integrate with your payment gateway's refund API
-        
+
         // Create refund record
         $booking->payment->update([
             'refund_amount' => $refundAmount,
@@ -1501,20 +1502,20 @@ class BookingController extends Controller
         if ($timeValue instanceof \Carbon\Carbon) {
             return $timeValue->format('H:i:s');
         }
-        
+
         $timeStr = (string) $timeValue;
-        
+
         // If already in H:i:s format (8 chars), return as-is
         if (strlen($timeStr) === 8 && preg_match('/^\d{2}:\d{2}:\d{2}$/', $timeStr)) {
             return $timeStr;
         }
-        
+
         // If it's a full datetime string, extract the time part
         if (strpos($timeStr, ' ') !== false) {
             $parts = explode(' ', $timeStr);
             return end($parts); // Get the last part (time)
         }
-        
+
         // Fallback: assume it's already valid or try to parse and reformat
         try {
             return Carbon::parse($timeStr)->format('H:i:s');
